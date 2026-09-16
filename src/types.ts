@@ -34,6 +34,7 @@ export interface Order {
   localId?: string;
   staffId: string;
   customerName: string;
+  customerAddress?: string;
   paymentMethod: PaymentMethod;
   items: OrderItem[];
   subtotal: number;
@@ -42,6 +43,15 @@ export interface Order {
   syncStatus: 'synced' | 'pending' | 'failed';
   createdAt: string;
   status?: 'pending' | 'approved' | 'rejected';
+}
+
+export interface ProofImage {
+  id: string;
+  dataUrl: string;
+  name: string;
+  category?: 'bottles' | 'odometer' | 'fuel' | 'receipt' | 'damage' | 'other';
+  uploadedAt: string;
+  size?: string;
 }
 
 export interface EodReport {
@@ -62,6 +72,7 @@ export interface EodReport {
     time: string;
   }>;
   fieldNotes: string;
+  proofImages?: ProofImage[];
   syncStatus: 'submitted' | 'pending' | 'reviewed';
   createdAt: string;
 }

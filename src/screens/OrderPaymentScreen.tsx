@@ -39,6 +39,11 @@ export const OrderPaymentScreen: React.FC<OrderPaymentScreenProps> = ({ onNaviga
 
   useEffect(() => {
     setCustomers(storageService.getCustomers());
+    storageService.fetchCustomersFromCloud().then((cloudData) => {
+      if (cloudData && cloudData.length > 0) {
+        setCustomers(cloudData);
+      }
+    });
     setProducts(INITIAL_PRODUCTS.map((p) => ({ ...p, quantity: 0 })));
   }, []);
 
@@ -171,13 +176,20 @@ export const OrderPaymentScreen: React.FC<OrderPaymentScreenProps> = ({ onNaviga
           onChange={(e) => setSelectedCustomer(e.target.value)}
           className="w-full bg-[#1A2E1C] border border-[#3A5068] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#00C46A]"
         >
-          <option value="">-- Choose a registered customer --</option>
+          <option value="">
+            {customers.length === 0 ? '-- No customers registered yet. Click + New Customer above --' : '-- Choose a registered customer --'}
+          </option>
           {customers.map((c) => (
             <option key={c.id} value={c.name}>
               {c.name} {c.phone ? `(${c.phone})` : ''}
             </option>
           ))}
         </select>
+        {customers.length === 0 && (
+          <p className="text-[11px] text-[#F59E0B] mt-1.5 flex items-center gap-1">
+            <span>Customer directory is clean. Tap "+ New Customer" above to register this delivery stop.</span>
+          </p>
+        )}
       </div>
 
       {/* 2. Product Catalog */}

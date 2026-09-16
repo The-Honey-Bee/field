@@ -28,6 +28,11 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
 
   useEffect(() => {
     setCustomers(storageService.getCustomers());
+    storageService.fetchCustomersFromCloud().then((cloudData) => {
+      if (cloudData && cloudData.length > 0) {
+        setCustomers(cloudData);
+      }
+    });
   }, []);
 
   const handleAddCustomer = (e: React.FormEvent) => {
@@ -105,56 +110,75 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
         />
       </div>
 
-      {/* Customers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filtered.map((c) => (
-          <div
-            key={c.id}
-            className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038] flex flex-col justify-between gap-3 shadow-md hover:border-[#00C46A]/50 transition-colors"
+      {/* Customers Grid or Empty State */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-12 px-4 bg-[#122010] rounded-2xl border border-dashed border-[#2A5038] space-y-3">
+          <Users className="w-10 h-10 mx-auto text-[#00C46A]/50" />
+          <h3 className="text-base font-bold text-white">No Customers Found</h3>
+          <p className="text-xs text-[#8899AA] max-w-sm mx-auto">
+            {search
+              ? `No customer records matched "${search}".`
+              : 'The customer directory is clean. Register your first commercial store, restaurant, or residential delivery point.'}
+          </p>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-1.5 bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] font-bold px-4 py-2 rounded-xl text-xs"
           >
-            <div>
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-[#00C46A]" />
-                  <span>{c.name}</span>
-                </h2>
+            <Plus className="w-4 h-4" />
+            <span>Add First Customer</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filtered.map((c) => (
+            <div
+              key={c.id}
+              className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038] flex flex-col justify-between gap-3 shadow-md hover:border-[#00C46A]/50 transition-colors"
+            >
+              <div>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-[#00C46A]" />
+                    <span>{c.name}</span>
+                  </h2>
+                  <button
+                    onClick={() => handleDelete(c.id, c.name)}
+                    className="text-[#8899AA] hover:text-red-400 p-1 transition-colors"
+                    title="Delete Customer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="mt-2 space-y-1 text-xs text-[#8899AA]">
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-3.5 h-3.5 text-[#00C46A]" />
+                    <a href={`tel:${c.phone}`} className="hover:underline text-[#D0E8F0] font-mono">
+                      {c.phone}
+                    </a>
+                  </div>
+                  {c.address && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 text-[#F59E0B]" />
+                      <span className="truncate">{c.address}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-[#243447] flex justify-end">
                 <button
-                  onClick={() => handleDelete(c.id, c.name)}
-                  className="text-[#8899AA] hover:text-red-400 p-1 transition-colors"
-                  title="Delete Customer"
+                  onClick={() => onNavigate('orders')}
+                  className="flex items-center gap-1.5 text-xs text-[#00C46A] hover:text-white font-semibold"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <ShoppingCart className="w-3.5 h-3.5" />
+                  <span>Create Order</span>
                 </button>
               </div>
-
-              <div className="mt-2 space-y-1 text-xs text-[#8899AA]">
-                <div className="flex items-center gap-2">
-                  <Phone className="w-3.5 h-3.5 text-[#00C46A]" />
-                  <a href={`tel:${c.phone}`} className="hover:underline text-[#D0E8F0] font-mono">
-                    {c.phone}
-                  </a>
-                </div>
-                {c.address && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-[#F59E0B]" />
-                    <span className="truncate">{c.address}</span>
-                  </div>
-                )}
-              </div>
             </div>
-
-            <div className="pt-2 border-t border-[#243447] flex justify-end">
-              <button
-                onClick={() => onNavigate('orders')}
-                className="flex items-center gap-1.5 text-xs text-[#00C46A] hover:text-white font-semibold"
-              >
-                <ShoppingCart className="w-3.5 h-3.5" />
-                <span>Create Order</span>
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Add Modal */}
       {showAddModal && (

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { storageService } from '../services/storage';
-import { Wifi, WifiOff, Bell, RefreshCw, ChevronDown, CheckCircle2, User, ShieldAlert } from 'lucide-react';
+import { Wifi, WifiOff, Bell, RefreshCw, ChevronDown, CheckCircle2, User, ShieldAlert, Database } from 'lucide-react';
 import { UserRole } from '../types';
+import { SupabaseStatusModal } from './SupabaseStatusModal';
 
 interface NavbarProps {
   currentView: string;
@@ -16,6 +17,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [showRoleMenu, setShowRoleMenu] = useState<boolean>(false);
   const [showNotifMenu, setShowNotifMenu] = useState<boolean>(false);
+  const [showDbModal, setShowDbModal] = useState<boolean>(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
   useEffect(() => {
@@ -111,6 +113,16 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-[#00C46A]' : ''}`} />
             </button>
           </div>
+
+          {/* Database / Supabase Cloud Diagnostic Button */}
+          <button
+            onClick={() => setShowDbModal(true)}
+            title="Database & Supabase Connection Status"
+            className="flex items-center gap-1 bg-[#122010] hover:bg-[#1A2E1C] border border-[#3A5068] text-[#8899AA] hover:text-[#00C46A] px-2.5 py-1.5 rounded-full text-xs transition-colors"
+          >
+            <Database className="w-3.5 h-3.5 text-[#00C46A]" />
+            <span className="hidden sm:inline font-medium">Cloud DB</span>
+          </button>
 
           {syncFeedback && (
             <div className="hidden lg:flex items-center gap-1 text-xs text-[#00C46A] animate-fade-in">
@@ -209,6 +221,12 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
           </button>
         </div>
       </div>
+
+      {/* Supabase Cloud Diagnostic Modal */}
+      <SupabaseStatusModal
+        isOpen={showDbModal}
+        onClose={() => setShowDbModal(false)}
+      />
     </header>
   );
 };

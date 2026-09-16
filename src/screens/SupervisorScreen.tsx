@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storage';
-import { Order, EodReport } from '../types';
+import { supabase } from '../lib/supabase';
+import { Order, EodReport, ProofImage } from '../types';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -11,6 +12,11 @@ import {
   DollarSign,
   Truck,
   AlertTriangle,
+  Camera,
+  Image as ImageIcon,
+  Eye,
+  X,
+  ZoomIn,
 } from 'lucide-react';
 
 interface SupervisorScreenProps {
@@ -22,10 +28,65 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
   const [orders, setOrders] = useState<Order[]>([]);
   const [reports, setReports] = useState<EodReport[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [supervisorPreviewImage, setSupervisorPreviewImage] = useState<ProofImage | null>(null);
+
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
   useEffect(() => {
-    setOrders(storageService.getOrders());
+    const loadedOrders = storageService.getOrders();
+    setOrders(loadedOrders);
     setReports(storageService.getReports());
+
+    // Load team members dynamically from Supabase profiles table
+    const fetchTeam = async () => {
+      try {
+        const { data, error } = await supabase.from('profiles').select('*');
+        if (!error && data && data.length > 0) {
+          const mapped = data.map((p: any) => {
+            const staffOrders = loadedOrders.filter(
+              (o) => o.staffId === p.employee_id || o.staffId === p.id
+            );
+            const revenue = staffOrders.reduce((sum, o) => sum + o.subtotal, 0);
+            return {
+              id: p.employee_id || p.id?.slice(0, 8) || 'ZZ-STAFF',
+              name: p.name || p.email || 'Field Staff',
+              route: p.role === 'supervisor' ? 'Central Operations' : 'Route Dispatch',
+              stopsCompleted: staffOrders.filter((o) => o.status === 'approved').length,
+              totalStops: staffOrders.length,
+              revenue,
+              status: p.role === 'supervisor' ? 'Supervisor HQ' : 'Active Field',
+              lastSync: 'Real-time (Cloud)',
+            };
+          });
+          setTeamMembers(mapped);
+          return;
+        }
+      } catch {
+        // Fallback
+      }
+
+      // If no cloud profiles yet, derive from local user
+      const currentUser = storageService.getUser();
+      if (currentUser) {
+        const staffOrders = loadedOrders;
+        setTeamMembers([
+          {
+            id: currentUser.employeeId || 'ZZ-STAFF',
+            name: currentUser.name || 'Staff User',
+            route: 'Assigned Dispatch Route',
+            stopsCompleted: staffOrders.filter((o) => o.status === 'approved').length,
+            totalStops: staffOrders.length,
+            revenue: staffOrders.reduce((sum, o) => sum + o.subtotal, 0),
+            status: 'Active Field',
+            lastSync: 'Just now',
+          },
+        ]);
+      } else {
+        setTeamMembers([]);
+      }
+    };
+
+    fetchTeam();
   }, []);
 
   const handleApproveOrder = (orderId: string) => {
@@ -48,49 +109,6 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
     setFeedback(`EOD Report ${reportId} marked as Reviewed & Reconciled`);
     setTimeout(() => setFeedback(null), 3000);
   };
-
-  const teamMembers = [
-    {
-      id: 'ZZ-2024-001',
-      name: 'Ali Hassan',
-      route: 'Route 4B - Dar Central',
-      stopsCompleted: 5,
-      totalStops: 8,
-      revenue: 350000,
-      status: 'Active Field',
-      lastSync: '4 mins ago',
-    },
-    {
-      id: 'ZZ-2024-002',
-      name: 'Juma Ramadhani',
-      route: 'Route 2A - Ilala / Kariakoo',
-      stopsCompleted: 7,
-      totalStops: 7,
-      revenue: 420000,
-      status: 'Route Complete',
-      lastSync: '12 mins ago',
-    },
-    {
-      id: 'ZZ-2024-003',
-      name: 'Baraka Mushi',
-      route: 'Route 6C - Kinondoni',
-      stopsCompleted: 4,
-      totalStops: 9,
-      revenue: 280000,
-      status: 'Active Field',
-      lastSync: '1 min ago',
-    },
-    {
-      id: 'ZZ-2024-004',
-      name: 'Salim Bakari',
-      route: 'Route 1D - Temeke South',
-      stopsCompleted: 6,
-      totalStops: 8,
-      revenue: 390000,
-      status: 'Active Field',
-      lastSync: '8 mins ago',
-    },
-  ];
 
   const pendingOrders = orders.filter((o) => o.status === 'pending');
 
@@ -305,6 +323,43 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
                     </div>
                   )}
 
+                  {report.proofImages && report.proofImages.length > 0 && (
+                    <div className="bg-[#162719] p-3 rounded-xl border border-[#2A5038] space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-white flex items-center gap-1.5">
+                          <Camera className="w-3.5 h-3.5 text-[#00C46A]" />
+                          <span>Attached Visual Proofs ({report.proofImages.length})</span>
+                        </span>
+                        <span className="text-[11px] text-[#8899AA]">Click to inspect full size</span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {report.proofImages.map((proof) => (
+                          <button
+                            key={proof.id}
+                            type="button"
+                            onClick={() => setSupervisorPreviewImage(proof)}
+                            className="group relative w-20 h-20 rounded-lg overflow-hidden border border-[#2A5038] hover:border-[#00C46A] transition-all bg-black/40 text-left"
+                            title={proof.name}
+                          >
+                            <img
+                              src={proof.dataUrl}
+                              alt={proof.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                              <ZoomIn className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] text-white px-1 py-0.5 truncate uppercase font-bold text-center">
+                              {proof.category || 'proof'}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex justify-end pt-1">
                     {report.syncStatus !== 'reviewed' ? (
                       <button
@@ -330,43 +385,112 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
 
       {/* TAB 3: Team Field Status */}
       {activeTab === 'team' && (
-        <div className="space-y-3">
-          {teamMembers.map((member) => (
-            <div
-              key={member.id}
-              className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#006B3C] text-white flex items-center justify-center font-bold text-xs border border-[#00C46A]/50">
-                  {member.name.slice(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-white">{member.name}</h3>
-                    <span className="font-mono text-xs text-[#8899AA]">({member.id})</span>
-                  </div>
-                  <div className="text-xs text-[#8899AA] mt-0.5">{member.route}</div>
-                  <div className="text-[10px] text-[#00C46A] mt-0.5">Last Sync: {member.lastSync}</div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between sm:justify-end gap-6">
-                <div>
-                  <div className="text-[10px] text-[#8899AA]">Stops Completed</div>
-                  <div className="font-mono text-xs font-bold text-white">
-                    {member.stopsCompleted} / {member.totalStops}
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <div className="text-[10px] text-[#8899AA]">Shift Revenue</div>
-                  <div className="font-mono text-sm font-bold text-[#00C46A]">
-                    TZS {member.revenue.toLocaleString()}
-                  </div>
-                </div>
-              </div>
+        <div>
+          {teamMembers.length === 0 ? (
+            <div className="text-center py-12 px-4 bg-[#122010] rounded-2xl border border-dashed border-[#2A5038] space-y-3">
+              <Users className="w-10 h-10 mx-auto text-[#00C46A]/50" />
+              <h3 className="text-base font-bold text-white">No Team Profiles Yet</h3>
+              <p className="text-xs text-[#8899AA] max-w-sm mx-auto">
+                Staff members who register accounts through the authentication portal will automatically appear in this supervisory dashboard.
+              </p>
             </div>
-          ))}
+          ) : (
+            <div className="space-y-3">
+              {teamMembers.map((member) => (
+                <div
+                  key={member.id}
+                  className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#006B3C] text-white flex items-center justify-center font-bold text-xs border border-[#00C46A]/50">
+                      {member.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-white">{member.name}</h3>
+                        <span className="font-mono text-xs text-[#8899AA]">({member.id})</span>
+                      </div>
+                      <div className="text-xs text-[#8899AA] mt-0.5">{member.route}</div>
+                      <div className="text-[10px] text-[#00C46A] mt-0.5">Last Sync: {member.lastSync}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-6">
+                    <div>
+                      <div className="text-[10px] text-[#8899AA]">Stops Completed</div>
+                      <div className="font-mono text-xs font-bold text-white">
+                        {member.stopsCompleted} / {member.totalStops}
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-[10px] text-[#8899AA]">Shift Revenue</div>
+                      <div className="font-mono text-sm font-bold text-[#00C46A]">
+                        TZS {member.revenue.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Fullscreen Supervisor Proof Preview Modal */}
+      {supervisorPreviewImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setSupervisorPreviewImage(null)}
+        >
+          <div
+            className="bg-[#122010] border border-[#00C46A]/50 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-[#2A5038] flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-[#00C46A]" />
+                  <span>{supervisorPreviewImage.name}</span>
+                </h3>
+                <span className="text-xs text-[#8899AA]">
+                  Verification Category:{' '}
+                  <span className="text-[#00C46A] font-semibold uppercase">
+                    {supervisorPreviewImage.category || 'General Proof'}
+                  </span>{' '}
+                  &bull; Time: {supervisorPreviewImage.uploadedAt}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSupervisorPreviewImage(null)}
+                className="w-8 h-8 rounded-lg bg-[#1A2E1C] hover:bg-[#253D28] text-white flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 bg-black/60 flex items-center justify-center overflow-auto max-h-[65vh]">
+              <img
+                src={supervisorPreviewImage.dataUrl}
+                alt={supervisorPreviewImage.name}
+                className="max-h-[60vh] max-w-full rounded-lg object-contain shadow-md"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+
+            <div className="p-4 border-t border-[#2A5038] flex items-center justify-between text-xs">
+              <span className="text-[#8899AA]">Supervisor Visual Proof Inspection</span>
+              <button
+                type="button"
+                onClick={() => setSupervisorPreviewImage(null)}
+                className="bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] font-bold px-4 py-1.5 rounded-lg"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

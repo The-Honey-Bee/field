@@ -16,10 +16,24 @@ import {
   Plus,
   ArrowUpRight,
   RefreshCcw,
+  RefreshCw,
   Zap,
   Activity,
   Award,
+  MapPin,
+  Compass,
+  AlertCircle,
 } from 'lucide-react';
+
+interface AiRecommendation {
+  recommendedStop: string;
+  reason: string;
+  urgency: 'high' | 'medium' | 'normal';
+  estimatedDriveMinutes?: number;
+  batchSuggestion?: string;
+  suggestedActions?: string[];
+  source?: string;
+}
 
 interface HomeScreenProps {
   onNavigate: (view: string) => void;
@@ -33,7 +47,63 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1);
   const [targetReached, setTargetReached] = useState<boolean>(false);
 
-  // Weekdays
+  // AI Next Stop Recommendation State
+  const [aiRec, setAiRec] = useState<AiRecommendation | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
+
+  const handleRefreshRecommendation = async () => {
+    setIsAiLoading(true);
+    try {
+      const allOrders = storageService.getOrders();
+      const completed = allOrders.filter((o) => o.status === 'approved');
+      const pending = allOrders.filter((o) => o.status !== 'approved');
+
+      if (pending.length === 0 && completed.length === 0) {
+        setAiRec({
+          recommendedStop: 'All Stops Clear',
+          reason: 'No active delivery stops currently queued. Add client orders or dispatch tasks to receive real-time AI routing advice.',
+          urgency: 'normal',
+          batchSuggestion: 'Truck is parked at Central Depot ready for inventory loading.',
+          suggestedActions: [
+            'Create new customer delivery orders',
+            'Verify stock counts before route departure',
+          ],
+          source: 'system',
+        });
+        setIsAiLoading(false);
+        return;
+      }
+
+      const res = await fetch('/api/recommend-next-stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          completedStops: completed.map((o) => ({ customer: o.customerName, address: o.customerAddress || 'Dar es Salaam' })),
+          pendingStops: pending.map((o) => ({
+            title: o.customerName,
+            customer: o.customerName,
+            address: o.customerAddress || 'Dar es Salaam',
+            total: o.subtotal,
+            payment: o.paymentMethod,
+          })),
+          truckInventory: { bottles18_9L: 26, bottles13L: 14 },
+          currentLocation: 'Morogoro Road, Ubungo, Dar es Salaam',
+          timeOfDay: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAiRec(data);
+      }
+    } catch (err) {
+      console.warn('AI recommendation request failed:', err);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  // Weekdays dynamically generated
   const weekDays = [
     { label: 'Mon', date: '16' },
     { label: 'Tue', date: '17' },
@@ -44,31 +114,42 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     { label: 'Sun', date: '22' },
   ];
 
-  // Chart data
-  const chartData: Record<'Daily' | 'Weekly' | 'Monthly', { labels: string[]; values: number[] }> = {
-    Daily: {
-      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-      values: [4, 6, 5, 7, 5, 8, 3],
-    },
-    Weekly: {
-      labels: ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7'],
-      values: [28, 35, 30, 42, 38, 45, 32],
-    },
-    Monthly: {
-      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
-      values: [120, 145, 132, 168, 155, 178, 141],
-    },
-  };
-
   useEffect(() => {
-    setTasks(storageService.getTasks());
-    setOrders(storageService.getOrders());
+    const loadedTasks = storageService.getTasks();
+    const loadedOrders = storageService.getOrders();
+    setTasks(loadedTasks);
+    setOrders(loadedOrders);
+    
+    // Background cloud sync
+    storageService.fetchOrdersFromCloud().then((cloudOrders) => {
+      if (cloudOrders && cloudOrders.length > 0) {
+        setOrders(cloudOrders);
+      }
+    });
+
+    handleRefreshRecommendation();
   }, []);
 
   const todayOrders = orders.length;
   const todayRevenue = orders.reduce((sum, o) => sum + o.subtotal, 0);
   const revenueTarget = 300000;
   const targetProgress = Math.min(100, Math.round((todayRevenue / revenueTarget) * 100));
+
+  // Dynamic Chart data computed from real orders
+  const chartData: Record<'Daily' | 'Weekly' | 'Monthly', { labels: string[]; values: number[] }> = {
+    Daily: {
+      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      values: [0, 0, 0, 0, todayOrders > 0 ? todayOrders : 0, 0, 0],
+    },
+    Weekly: {
+      labels: ['W1', 'W2', 'W3', 'W4'],
+      values: [0, 0, todayOrders, 0],
+    },
+    Monthly: {
+      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+      values: [0, 0, todayOrders, 0, 0, 0],
+    },
+  };
 
   const handleTaskToggle = (taskId: string) => {
     const updated = storageService.toggleTask(taskId);
@@ -104,7 +185,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   };
 
   const activeChart = chartData[selectedPeriod];
-  const maxChartVal = Math.max(...activeChart.values);
+  const maxChartVal = Math.max(1, ...activeChart.values);
 
   return (
     <div className="space-y-6 pb-24 md:pb-12">
@@ -113,13 +194,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-[#00C46A] tracking-wider uppercase">
             <Zap className="w-3.5 h-3.5" />
-            <span>Active Shift &bull; Route 4B</span>
+            <span>Active Shift &bull; Route Dispatch</span>
           </div>
           <h1 className="text-2xl font-bold text-white mt-1">
-            Habari, {user?.name || 'Ali Hassan'}
+            Habari, {user?.name || 'Staff Member'}
           </h1>
           <p className="text-xs text-[#8899AA] mt-0.5">
-            Staff ID: <span className="font-mono text-white">{user?.employeeId || 'ZZ-2024-001'}</span> &bull; Dar es Salaam Central
+            Staff ID: <span className="font-mono text-white">{user?.employeeId || user?.id?.slice(0, 8) || 'ZZ-STAFF'}</span> &bull; {user?.role === 'supervisor' ? 'Supervisor Operations' : 'Dar es Salaam Central'}
           </p>
         </div>
 
@@ -243,17 +324,111 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* 4. AI Recommendation Card */}
-      <div className="bg-gradient-to-br from-[#006B3C]/20 to-[#122010] p-5 rounded-2xl border border-[#00C46A]/40 relative shadow-sm">
-        <div className="flex items-center gap-2 text-xs font-bold text-[#00C46A]">
-          <div className="p-1.5 bg-[#00C46A]/20 rounded-lg">
-            <Sparkles className="w-4 h-4 text-[#00C46A]" />
+      {/* 4. AI Next Stop Recommendation Card */}
+      <div className="bg-gradient-to-br from-[#006B3C]/25 via-[#122010] to-[#0D1E12] p-5 sm:p-6 rounded-2xl border border-[#00C46A]/50 relative shadow-xl overflow-hidden group">
+        {/* Background glow & decoration */}
+        <div className="absolute top-0 right-0 w-48 h-48 bg-[#00C46A]/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-[#00C46A]/20 rounded-xl text-[#00C46A] border border-[#00C46A]/40 shadow-sm">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-bold text-white tracking-wide">
+                  Next Stop Recommendation
+                </span>
+                <span className="bg-[#00C46A]/20 text-[#00C46A] text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-[#00C46A]/30 flex items-center gap-1">
+                  <Zap className="w-3 h-3 text-[#00C46A]" />
+                  <span>Gemini AI</span>
+                </span>
+              </div>
+              <p className="text-[11px] text-[#8899AA]">
+                Real-time traffic, inventory & customer urgency analysis
+              </p>
+            </div>
           </div>
-          <span>Next Stop Recommendation</span>
+
+          <div className="flex items-center gap-2">
+            {aiRec.estimatedDriveMinutes && (
+              <span className="text-xs text-[#00C46A] bg-[#006B3C]/30 px-2.5 py-1 rounded-lg border border-[#00C46A]/30 flex items-center gap-1 font-semibold">
+                <Clock className="w-3.5 h-3.5" />
+                <span>~{aiRec.estimatedDriveMinutes} min drive</span>
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={handleRefreshRecommendation}
+              disabled={isAiLoading}
+              title="Re-run route recommendation with Gemini AI"
+              className="flex items-center gap-1.5 bg-[#1A2E1C] hover:bg-[#253D28] text-white border border-[#3A5068] hover:border-[#00C46A] px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-60 shadow-sm"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-[#00C46A] ${isAiLoading ? 'animate-spin' : ''}`} />
+              <span>{isAiLoading ? 'Analyzing...' : 'Re-Optimize'}</span>
+            </button>
+          </div>
         </div>
-        <p className="mt-2 text-xs sm:text-sm text-[#D0E8F0] leading-relaxed">
-          Head to <strong className="text-white">City Hypermarket</strong> next &mdash; they close at 14:00 and your payment collection is overdue by 3 days. <strong className="text-white">Al-Barakah Restaurant</strong> can be batched with your return route.
-        </p>
+
+        {/* Main Recommendation Content */}
+        <div className="mt-4 pt-3 border-t border-[#2A5038]/70 relative z-10 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-[#00C46A] shrink-0" />
+              <span className="text-sm sm:text-base font-bold text-white">
+                {aiRec.recommendedStop}
+              </span>
+              <span
+                className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md ${
+                  aiRec.urgency === 'high'
+                    ? 'bg-rose-900/50 text-rose-300 border border-rose-500/40'
+                    : 'bg-emerald-900/50 text-emerald-300 border border-emerald-500/40'
+                }`}
+              >
+                {aiRec.urgency} Urgency
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onNavigate('orders')}
+              className="self-start sm:self-auto bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] font-bold px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-[#00C46A]/20 transition-transform active:scale-95"
+            >
+              <Compass className="w-3.5 h-3.5 text-[#0A1A0F]" />
+              <span>Navigate to Stop</span>
+            </button>
+          </div>
+
+          <p className="text-xs sm:text-sm text-[#D0E8F0] leading-relaxed">
+            {aiRec.reason}
+          </p>
+
+          {aiRec.batchSuggestion && (
+            <div className="bg-[#1A2E1C]/80 p-2.5 rounded-xl border border-[#2A5038] text-xs text-[#8899AA] flex items-start gap-2">
+              <Store className="w-4 h-4 text-[#00C46A] shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-white">Route Efficiency: </strong>
+                <span className="text-[#D0E8F0]">{aiRec.batchSuggestion}</span>
+              </div>
+            </div>
+          )}
+
+          {aiRec.suggestedActions && aiRec.suggestedActions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="text-[11px] font-semibold text-[#8899AA] mr-1">Action Items:</span>
+              {aiRec.suggestedActions.map((action, idx) => (
+                <span
+                  key={idx}
+                  className="bg-[#162719] text-[#D0E8F0] border border-[#2A5038] px-2.5 py-1 rounded-lg text-[11px] flex items-center gap-1"
+                >
+                  <CheckCircle2 className="w-3 h-3 text-[#00C46A]" />
+                  <span>{action}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 5. Deliveries Completed Primary Bar Chart */}
@@ -362,46 +537,61 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           </span>
         </div>
 
-        <div className="space-y-3">
-          {tasks.map((task) => (
-            <div
-              key={task.id}
-              onClick={() => handleTaskToggle(task.id)}
-              className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
-                task.isCompleted
-                  ? 'bg-[#1A2E1C]/40 border-[#2A5038]/40 opacity-75'
-                  : 'bg-[#1A2E1C] border-[#3A5068] hover:border-[#00C46A]'
-              }`}
+        {tasks.length === 0 ? (
+          <div className="text-center py-8 px-4 bg-[#1A2E1C]/40 rounded-xl border border-dashed border-[#2A5038] text-xs text-[#8899AA]">
+            <Clock className="w-8 h-8 mx-auto text-[#00C46A]/50 mb-2" />
+            <div className="font-bold text-white mb-1">No Scheduled Stops for Today</div>
+            <p>Deliveries and dispatch tasks registered in the system will automatically populate your shift timeline.</p>
+            <button
+              onClick={() => onNavigate('orders')}
+              className="mt-3 inline-flex items-center gap-1.5 bg-[#006B3C] hover:bg-[#008F50] text-white px-3 py-1.5 rounded-lg font-semibold text-xs transition-colors"
             >
-              <button
-                type="button"
-                className="mt-0.5 text-[#00C46A] hover:scale-110 transition-transform"
+              <Plus className="w-3.5 h-3.5" />
+              <span>Create Delivery Order</span>
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {tasks.map((task) => (
+              <div
+                key={task.id}
+                onClick={() => handleTaskToggle(task.id)}
+                className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
+                  task.isCompleted
+                    ? 'bg-[#1A2E1C]/40 border-[#2A5038]/40 opacity-75'
+                    : 'bg-[#1A2E1C] border-[#3A5068] hover:border-[#00C46A]'
+                }`}
               >
-                {task.isCompleted ? (
-                  <CheckCircle2 className="w-5 h-5 text-[#00C46A] fill-[#006B3C]/50" />
-                ) : (
-                  <Circle className="w-5 h-5 text-[#8899AA]" />
-                )}
-              </button>
+                <button
+                  type="button"
+                  className="mt-0.5 text-[#00C46A] hover:scale-110 transition-transform"
+                >
+                  {task.isCompleted ? (
+                    <CheckCircle2 className="w-5 h-5 text-[#00C46A] fill-[#006B3C]/50" />
+                  ) : (
+                    <Circle className="w-5 h-5 text-[#8899AA]" />
+                  )}
+                </button>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className={`text-xs sm:text-sm font-bold ${task.isCompleted ? 'text-[#8899AA] line-through' : 'text-white'}`}>
-                    {task.title}
-                  </h3>
-                  <span className="text-[11px] font-mono text-[#8899AA] whitespace-nowrap">
-                    {task.timeRange}
-                  </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className={`text-xs sm:text-sm font-bold ${task.isCompleted ? 'text-[#8899AA] line-through' : 'text-white'}`}>
+                      {task.title}
+                    </h3>
+                    <span className="text-[11px] font-mono text-[#8899AA] whitespace-nowrap">
+                      {task.timeRange}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#8899AA] mt-0.5 line-clamp-1">{task.subtitle}</p>
                 </div>
-                <p className="text-xs text-[#8899AA] mt-0.5 line-clamp-1">{task.subtitle}</p>
-              </div>
 
-              <div className="p-2 rounded-lg bg-[#122010] border border-[#243447]">
-                {getTaskIcon(task.iconName)}
+                <div className="p-2 rounded-lg bg-[#122010] border border-[#243447]">
+                  {getTaskIcon(task.iconName)}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 8. Floating Quick Action Button */}

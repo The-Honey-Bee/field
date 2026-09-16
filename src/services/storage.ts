@@ -1,5 +1,5 @@
 import { Product, Customer, Order, EodReport, ChatMessage, ActivityLogEntry, TimelineTask } from '../types';
-import { supabase } from './supabase';
+import { supabase } from '../lib/supabase';
 
 const STORAGE_KEYS = {
   ORDERS: 'zamzam_orders',
@@ -12,6 +12,7 @@ const STORAGE_KEYS = {
   USER_PREFS: 'zamzam_user_prefs',
 };
 
+// Production catalog for Zamzam pure water products
 export const INITIAL_PRODUCTS: Product[] = [
   {
     id: 'prod-1',
@@ -39,225 +40,42 @@ export const INITIAL_PRODUCTS: Product[] = [
   },
 ];
 
-export const INITIAL_CUSTOMERS: Customer[] = [
-  {
-    id: 'cust-1',
-    name: 'City Hypermarket',
-    phone: '+255 712 345 678',
-    address: 'Nyerere Road, Plot 14, Dar es Salaam',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'cust-2',
-    name: 'Al-Barakah Restaurant',
-    phone: '+255 784 992 110',
-    address: 'Kariakoo Market St, Dar es Salaam',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'cust-3',
-    name: 'Metro Mart Express',
-    phone: '+255 655 432 100',
-    address: 'Ali Hassan Mwinyi Rd, Kinondoni',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'cust-4',
-    name: 'Oasis Luxury Plaza',
-    phone: '+255 754 888 222',
-    address: 'Masaki Peninsula, Haile Selassie Rd',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'cust-5',
-    name: 'Grand Serena Hotel',
-    phone: '+255 768 112 334',
-    address: 'Ohio Street, Posta, Dar es Salaam',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'cust-6',
-    name: 'Sunrise Bakery & Cafe',
-    phone: '+255 713 554 990',
-    address: 'Morogoro Road, Ubungo',
-    createdAt: new Date().toISOString(),
-  },
-];
+// Production state: all customer, order, task, and message lists start clean without mock data
+export const INITIAL_CUSTOMERS: Customer[] = [];
+export const INITIAL_TASKS: TimelineTask[] = [];
+export const INITIAL_MESSAGES: ChatMessage[] = [];
+export const INITIAL_ORDERS: Order[] = [];
 
-export const INITIAL_TASKS: TimelineTask[] = [
-  {
-    id: 'task-1',
-    time: '08:30 AM',
-    timeRange: '08:30 - 09:15',
-    title: 'City Hypermarket Delivery',
-    subtitle: 'Deliver 25x 18.9L bottles & collect overdue payment',
-    iconName: 'local_shipping',
-    iconColor: '#00C46A',
-    status: 'completed',
-    isCompleted: true,
-  },
-  {
-    id: 'task-2',
-    time: '10:00 AM',
-    timeRange: '10:00 - 10:45',
-    title: 'Al-Barakah Restaurant Drop',
-    subtitle: 'Replenish 15x 13L bottles with cash invoice',
-    iconName: 'store',
-    iconColor: '#3B82F6',
-    status: 'completed',
-    isCompleted: true,
-  },
-  {
-    id: 'task-3',
-    time: '11:45 AM',
-    timeRange: '11:45 - 12:30',
-    title: 'Metro Mart Express Replenish',
-    subtitle: 'Deliver 30x 18.9L refill bottles',
-    iconName: 'local_shipping',
-    iconColor: '#F59E0B',
-    status: 'completed',
-    isCompleted: true,
-  },
-  {
-    id: 'task-4',
-    time: '01:30 PM',
-    timeRange: '01:30 - 02:15',
-    title: 'Oasis Luxury Plaza',
-    subtitle: 'Payment collection & empty bottle exchange (10x)',
-    iconName: 'payments',
-    iconColor: '#EC4899',
-    status: 'completed',
-    isCompleted: true,
-  },
-  {
-    id: 'task-5',
-    time: '03:15 PM',
-    timeRange: '03:15 - 04:00',
-    title: 'Grand Serena Hotel Scheduled Stop',
-    subtitle: 'Restock 40x 18.9L dispenser bottles',
-    iconName: 'inventory',
-    iconColor: '#00C46A',
-    status: 'completed',
-    isCompleted: true,
-  },
-  {
-    id: 'task-6',
-    time: '04:45 PM',
-    timeRange: '04:45 - 05:30',
-    title: 'Sunrise Bakery Delivery',
-    subtitle: 'Scheduled bi-weekly refill (12x 13L bottles)',
-    iconName: 'store',
-    iconColor: '#F59E0B',
-    status: 'pending',
-    isCompleted: false,
-  },
-  {
-    id: 'task-7',
-    time: '05:45 PM',
-    timeRange: '05:45 - 06:15',
-    title: 'Central Depot Check-in',
-    subtitle: 'Submit daily cash collections & sign EOD reconciliation',
-    iconName: 'payments',
-    iconColor: '#8B5CF6',
-    status: 'pending',
-    isCompleted: false,
-  },
-  {
-    id: 'task-8',
-    time: '06:30 PM',
-    timeRange: '06:30 - 06:45',
-    title: 'Vehicle & Empties Handover',
-    subtitle: 'Truck inventory audit and security lockup',
-    iconName: 'inventory',
-    iconColor: '#6B7280',
-    status: 'pending',
-    isCompleted: false,
-  },
-];
+// Clean up any legacy demo mock records from previous testing sessions
+const purgeDemoMockData = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const ordersRaw = localStorage.getItem(STORAGE_KEYS.ORDERS);
+    if (ordersRaw && ordersRaw.includes('ord-1001')) {
+      localStorage.removeItem(STORAGE_KEYS.ORDERS);
+    }
+    const custsRaw = localStorage.getItem(STORAGE_KEYS.CUSTOMERS);
+    if (custsRaw && custsRaw.includes('cust-1')) {
+      localStorage.removeItem(STORAGE_KEYS.CUSTOMERS);
+    }
+    const tasksRaw = localStorage.getItem(STORAGE_KEYS.TASKS);
+    if (tasksRaw && tasksRaw.includes('task-1')) {
+      localStorage.removeItem(STORAGE_KEYS.TASKS);
+    }
+    const msgsRaw = localStorage.getItem(STORAGE_KEYS.MESSAGES);
+    if (msgsRaw && msgsRaw.includes('msg-1')) {
+      localStorage.removeItem(STORAGE_KEYS.MESSAGES);
+    }
+    const logsRaw = localStorage.getItem(STORAGE_KEYS.LOGS);
+    if (logsRaw && logsRaw.includes('log-1')) {
+      localStorage.removeItem(STORAGE_KEYS.LOGS);
+    }
+  } catch {
+    // ignore
+  }
+};
 
-export const INITIAL_MESSAGES: ChatMessage[] = [
-  {
-    id: 'msg-1',
-    senderId: 'sup-1',
-    senderName: 'Tariq Al-Mansoor (Supervisor)',
-    receiverId: 'field-1',
-    receiverName: 'Field Staff',
-    content: 'Please prioritize City Hypermarket on Nyerere Rd. They requested extra 10 bottles.',
-    createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    isRead: true,
-    syncStatus: 'sent',
-  },
-  {
-    id: 'msg-2',
-    senderId: 'field-1',
-    senderName: 'Field Staff',
-    receiverId: 'sup-1',
-    receiverName: 'Tariq Al-Mansoor (Supervisor)',
-    content: 'Received. Delivery completed and payment collected via M-Pesa.',
-    createdAt: new Date(Date.now() - 1000 * 60 * 20).toISOString(),
-    isRead: true,
-    syncStatus: 'sent',
-  },
-  {
-    id: 'msg-3',
-    senderId: 'sup-1',
-    senderName: 'Tariq Al-Mansoor (Supervisor)',
-    receiverId: 'field-1',
-    receiverName: 'Field Staff',
-    content: 'Great work! Don\'t forget to submit your EOD report before 6:30 PM.',
-    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    isRead: true,
-    syncStatus: 'sent',
-  },
-];
-
-export const INITIAL_ORDERS: Order[] = [
-  {
-    id: 'ord-1001',
-    staffId: 'ZZ-2024-001',
-    customerName: 'City Hypermarket',
-    paymentMethod: 'mobile',
-    items: [
-      { id: 'prod-2', name: 'ZAMZAM Pure Drinking Water 18.9L', qty: 25, price: 5000, subtotal: 125000 },
-    ],
-    subtotal: 125000,
-    amountReceived: 125000,
-    changeAmount: 0,
-    syncStatus: 'synced',
-    createdAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-    status: 'approved',
-  },
-  {
-    id: 'ord-1002',
-    staffId: 'ZZ-2024-001',
-    customerName: 'Al-Barakah Restaurant',
-    paymentMethod: 'cash',
-    items: [
-      { id: 'prod-1', name: 'ZAMZAM Pure Drinking Water 13L', qty: 15, price: 5000, subtotal: 75000 },
-    ],
-    subtotal: 75000,
-    amountReceived: 80000,
-    changeAmount: 5000,
-    syncStatus: 'synced',
-    createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    status: 'approved',
-  },
-  {
-    id: 'ord-1003',
-    staffId: 'ZZ-2024-001',
-    customerName: 'Metro Mart Express',
-    paymentMethod: 'cash',
-    items: [
-      { id: 'prod-3', name: 'ZAMZAM Pure Drinking Water 18.9L/R', qty: 30, price: 5000, subtotal: 150000 },
-    ],
-    subtotal: 150000,
-    amountReceived: 150000,
-    changeAmount: 0,
-    syncStatus: 'synced',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-    status: 'pending',
-  },
-];
+purgeDemoMockData();
 
 class StorageService {
   private isOnlineStatus: boolean = typeof navigator !== 'undefined' ? navigator.onLine : true;
@@ -267,6 +85,9 @@ class StorageService {
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => this.handleNetworkChange(true));
       window.addEventListener('offline', () => this.handleNetworkChange(false));
+      // Background sync on boot
+      this.fetchCustomersFromCloud();
+      this.fetchOrdersFromCloud();
     }
   }
 
@@ -275,6 +96,8 @@ class StorageService {
     this.listeners.forEach((fn) => fn(online));
     if (online) {
       this.syncPendingQueue();
+      this.fetchCustomersFromCloud();
+      this.fetchOrdersFromCloud();
     }
   }
 
@@ -293,14 +116,33 @@ class StorageService {
   public getCustomers(): Customer[] {
     const raw = localStorage.getItem(STORAGE_KEYS.CUSTOMERS);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(INITIAL_CUSTOMERS));
-      return INITIAL_CUSTOMERS;
+      return [];
     }
     try {
       return JSON.parse(raw);
     } catch {
-      return INITIAL_CUSTOMERS;
+      return [];
     }
+  }
+
+  public async fetchCustomersFromCloud(): Promise<Customer[]> {
+    try {
+      const { data, error } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        const cloudCustomers: Customer[] = data.map((c: any) => ({
+          id: c.id?.toString() || 'cust-' + Date.now(),
+          name: c.name || 'Unnamed Client',
+          phone: c.phone || '',
+          address: c.address || '',
+          createdAt: c.created_at || new Date().toISOString(),
+        }));
+        localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(cloudCustomers));
+        return cloudCustomers;
+      }
+    } catch {
+      // offline or table not present
+    }
+    return this.getCustomers();
   }
 
   public saveCustomer(customer: Omit<Customer, 'id' | 'createdAt'>): Customer {
@@ -328,7 +170,7 @@ class StorageService {
         name: newCustomer.name,
         phone: newCustomer.phone,
         address: newCustomer.address,
-      }).then().catch(() => {});
+      }).then(() => {}, () => {});
     }
 
     return newCustomer;
@@ -343,14 +185,39 @@ class StorageService {
   public getOrders(): Order[] {
     const raw = localStorage.getItem(STORAGE_KEYS.ORDERS);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(INITIAL_ORDERS));
-      return INITIAL_ORDERS;
+      return [];
     }
     try {
       return JSON.parse(raw);
     } catch {
-      return INITIAL_ORDERS;
+      return [];
     }
+  }
+
+  public async fetchOrdersFromCloud(): Promise<Order[]> {
+    try {
+      const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        const cloudOrders: Order[] = data.map((o: any) => ({
+          id: o.id?.toString() || 'ord-' + Date.now(),
+          staffId: o.staff_id || '',
+          customerName: o.customer_name || 'Client',
+          paymentMethod: o.payment_method || 'cash',
+          items: o.items || [],
+          subtotal: Number(o.subtotal) || 0,
+          amountReceived: Number(o.amount_received) || Number(o.subtotal) || 0,
+          changeAmount: Number(o.change_amount) || 0,
+          syncStatus: 'synced',
+          createdAt: o.created_at || new Date().toISOString(),
+          status: o.status || 'pending',
+        }));
+        localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(cloudOrders));
+        return cloudOrders;
+      }
+    } catch {
+      // offline or table not present
+    }
+    return this.getOrders();
   }
 
   public async saveOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'syncStatus'>): Promise<Order> {
@@ -412,8 +279,27 @@ class StorageService {
         status: 'success',
       });
       if (this.isOnlineStatus) {
-        supabase.from('orders').update({ status }).eq('id', orderId).then().catch(() => {});
+        supabase.from('orders').update({ status }).eq('id', orderId).then(() => {}, () => {});
       }
+    }
+  }
+
+  // --- User Profile ---
+  public getUser(): UserProfile | null {
+    const raw = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  public setUser(user: UserProfile | null) {
+    if (!user) {
+      localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
+    } else {
+      localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(user));
     }
   }
 
@@ -486,13 +372,12 @@ class StorageService {
   public getMessages(): ChatMessage[] {
     const raw = localStorage.getItem(STORAGE_KEYS.MESSAGES);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(INITIAL_MESSAGES));
-      return INITIAL_MESSAGES;
+      return [];
     }
     try {
       return JSON.parse(raw);
     } catch {
-      return INITIAL_MESSAGES;
+      return [];
     }
   }
 
@@ -514,13 +399,12 @@ class StorageService {
   public getTasks(): TimelineTask[] {
     const raw = localStorage.getItem(STORAGE_KEYS.TASKS);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(INITIAL_TASKS));
-      return INITIAL_TASKS;
+      return [];
     }
     try {
       return JSON.parse(raw);
     } catch {
-      return INITIAL_TASKS;
+      return [];
     }
   }
 
@@ -539,46 +423,7 @@ class StorageService {
   public getActivityLogs(): ActivityLogEntry[] {
     const raw = localStorage.getItem(STORAGE_KEYS.LOGS);
     if (!raw) {
-      const initialLogs: ActivityLogEntry[] = [
-        {
-          id: 'log-1',
-          userId: 'ZZ-2024-001',
-          userName: 'Ali Hassan',
-          userRole: 'Field Staff',
-          action: 'user_login',
-          entityType: 'auth',
-          entityId: 'auth-1',
-          description: 'Staff logged in from Mobile Dispatch unit',
-          status: 'success',
-          createdAt: new Date(Date.now() - 1000 * 60 * 240).toISOString(),
-        },
-        {
-          id: 'log-2',
-          userId: 'ZZ-2024-001',
-          userName: 'Ali Hassan',
-          userRole: 'Field Staff',
-          action: 'order_approved',
-          entityType: 'order',
-          entityId: 'ord-1001',
-          description: 'Order #ord-1001 verified and approved for City Hypermarket',
-          status: 'success',
-          createdAt: new Date(Date.now() - 1000 * 60 * 170).toISOString(),
-        },
-        {
-          id: 'log-3',
-          userId: 'ZZ-2024-001',
-          userName: 'Ali Hassan',
-          userRole: 'Field Staff',
-          action: 'sync_success',
-          entityType: 'sync',
-          entityId: 'sync-1',
-          description: 'Offline records synchronized with Cloud Supabase',
-          status: 'success',
-          createdAt: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
-        },
-      ];
-      localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(initialLogs));
-      return initialLogs;
+      return [];
     }
     try {
       return JSON.parse(raw);
