@@ -9,6 +9,18 @@ export interface UserProfile {
   employeeId: string;
 }
 
+export interface BiometricCredential {
+  id: string; // Base64URL encoded credential ID
+  rawId?: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  deviceLabel: string;
+  createdAt: string;
+  counter?: number;
+  transports?: string[];
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -122,3 +134,6 @@ export interface TimelineTask {
   status: 'pending' | 'completed' | 'in_transit';
   isCompleted: boolean;
 }
+
+export type ThemeMode = 'dark' | 'sunlight';
+

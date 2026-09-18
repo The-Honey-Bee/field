@@ -22,7 +22,169 @@ body {
   overflow-x: hidden;
 }
 
-/* Custom scrollbars */
+/* ==========================================================================
+   High-Contrast Outdoor Sunlight Mode (Field Daylight / Glare Optimized)
+   ========================================================================== */
+html.theme-sunlight,
+body.theme-sunlight,
+.theme-sunlight {
+  background-color: #F4F6F8 !important;
+  color: #0A1A0F !important;
+}
+
+/* Scrollbars in Sunlight Mode */
+.theme-sunlight ::-webkit-scrollbar-track {
+  background: #F1F5F9 !important;
+}
+.theme-sunlight ::-webkit-scrollbar-thumb {
+  background: #94A3B8 !important;
+}
+.theme-sunlight ::-webkit-scrollbar-thumb:hover {
+  background: #007A40 !important;
+}
+
+/* Background mappings for High-Contrast Sunlight Mode */
+.theme-sunlight .bg-\[\#0A1A0F\],
+.theme-sunlight .bg-\[\#0A1A0F\]\/90,
+.theme-sunlight .bg-\[\#0A1A0F\]\/95 {
+  background-color: #F4F6F8 !important;
+}
+
+/* Main Cards -> Pure White with crisp high-contrast border and soft shadow */
+.theme-sunlight .bg-\[\#122010\] {
+  background-color: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.07), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Sub-panels, Table Rows, Card Insets */
+.theme-sunlight .bg-\[\#1A2E1C\],
+.theme-sunlight .bg-\[\#1A2E1C\]\/60 {
+  background-color: #F8FAFC !important;
+  border-color: #CBD5E1 !important;
+}
+
+.theme-sunlight .bg-\[\#0D1E12\] {
+  background-color: #EBF1F6 !important;
+  border-color: #CBD5E1 !important;
+}
+
+.theme-sunlight .bg-\[\#162719\],
+.theme-sunlight .bg-\[\#142416\],
+.theme-sunlight .bg-\[\#223A24\] {
+  background-color: #F1F5F9 !important;
+  border-color: #CBD5E1 !important;
+}
+
+/* Header & Navigation bars in Sunlight Mode */
+.theme-sunlight header {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-bottom-color: #CBD5E1 !important;
+}
+.theme-sunlight .md\:hidden.fixed.bottom-0 {
+  background-color: rgba(255, 255, 255, 0.97) !important;
+  border-top-color: #CBD5E1 !important;
+}
+
+/* Text readability in harsh glare (WCAG AAA High Contrast) */
+.theme-sunlight .text-\[\#D0E8F0\] {
+  color: #0F172A !important;
+  font-weight: 500;
+}
+
+.theme-sunlight .text-\[\#8899AA\],
+.theme-sunlight .text-\[\#64748B\] {
+  color: #334155 !important;
+  font-weight: 500;
+}
+
+.theme-sunlight .text-white {
+  color: #09120B !important;
+}
+
+/* Headings in Sunlight Mode */
+.theme-sunlight h1,
+.theme-sunlight h2,
+.theme-sunlight h3,
+.theme-sunlight h4 {
+  color: #0A1A0F !important;
+  font-weight: 700;
+}
+
+/* Borders in Sunlight Mode */
+.theme-sunlight .border-\[\#243447\],
+.theme-sunlight .border-\[\#2A5038\],
+.theme-sunlight .border-\[\#3A5068\],
+.theme-sunlight .border-\[\#3A5068\]\/40,
+.theme-sunlight .border-\[\#3A5068\]\/50 {
+  border-color: #CBD5E1 !important;
+}
+
+/* Input Fields & Textareas in Sunlight Mode */
+.theme-sunlight input[type="text"],
+.theme-sunlight input[type="email"],
+.theme-sunlight input[type="password"],
+.theme-sunlight input[type="number"],
+.theme-sunlight select,
+.theme-sunlight textarea {
+  color: #0A1A0F !important;
+  background-color: #FFFFFF !important;
+}
+.theme-sunlight input::placeholder,
+.theme-sunlight textarea::placeholder {
+  color: #64748B !important;
+}
+
+/* Primary Green Buttons in Sunlight Mode - retain crisp white text on deep rich green */
+.theme-sunlight .bg-\[\#006B3C\],
+.theme-sunlight .bg-\[\#008F50\],
+.theme-sunlight .bg-\[\#00C46A\] {
+  background-color: #007A40 !important;
+  color: #FFFFFF !important;
+  border-color: #006032 !important;
+}
+.theme-sunlight .bg-\[\#006B3C\] *,
+.theme-sunlight .bg-\[\#008F50\] *,
+.theme-sunlight .bg-\[\#00C46A\] *,
+.theme-sunlight button.bg-gradient-to-r *,
+.theme-sunlight button.bg-gradient-to-r span,
+.theme-sunlight button.bg-\[\#00C46A\] span,
+.theme-sunlight button.bg-\[\#006B3C\] span,
+.theme-sunlight .text-white.font-bold,
+.theme-sunlight button.text-white {
+  color: #FFFFFF !important;
+}
+
+/* Status pills & highlights in Sunlight Mode */
+.theme-sunlight .bg-\[\#006B3C\]\/40,
+.theme-sunlight .bg-\[\#006B3C\]\/30,
+.theme-sunlight .bg-\[\#006B3C\]\/20 {
+  background-color: #DCFCE7 !important;
+  border-color: #86EFAC !important;
+  color: #166534 !important;
+}
+.theme-sunlight .bg-\[\#006B3C\]\/40 *,
+.theme-sunlight .bg-\[\#006B3C\]\/30 * {
+  color: #166534 !important;
+}
+
+.theme-sunlight .text-\[\#00C46A\] {
+  color: #007A40 !important;
+  font-weight: 600;
+}
+
+/* Dropdown menus & Modals in Sunlight Mode */
+.theme-sunlight .bg-\[\#122010\].border-\[\#3A5068\] {
+  background-color: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.theme-sunlight .hover\:bg-\[\#1A2E1C\]:hover,
+.theme-sunlight .hover\:bg-\[\#122010\]:hover {
+  background-color: #F1F5F9 !important;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -37,3 +199,42 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #00C46A;
 }
+
+/* ==========================================================================
+   Print Styling (Standardized A4 / Letter performance documents)
+   ========================================================================== */
+@media print {
+  body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Hide navigation, background controls and interactive buttons during print */
+  header,
+  nav,
+  aside,
+  .no-print,
+  button,
+  .fixed.bottom-0,
+  #btn-theme-toggle,
+  #btn-export-performance {
+    display: none !important;
+  }
+
+  /* Target printable performance summary element specifically */
+  #printable-performance-summary {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #FFFFFF !important;
+    color: #0A1A0F !important;
+  }
+}
+

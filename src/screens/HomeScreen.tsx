@@ -3,6 +3,7 @@ import confetti from 'canvas-confetti';
 import { useAuth } from '../context/AuthContext';
 import { storageService } from '../services/storage';
 import { TimelineTask, Order } from '../types';
+import { DeliveryCompletionDashboard } from '../components/DeliveryCompletionDashboard';
 import {
   Sparkles,
   TrendingUp,
@@ -264,7 +265,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* 3. Dual Metric Row (Route Progress & Pending Sync) */}
+      {/* 3. Recharts Active User Today's Delivery Completion Dashboard */}
+      <DeliveryCompletionDashboard
+        user={user}
+        tasks={tasks}
+        orders={orders}
+        onNavigate={onNavigate}
+      />
+
+      {/* 4. Dual Metric Row (Route Progress & Pending Sync) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Left Card: Route Progress */}
         <div className="bg-[#122010] p-5 rounded-2xl border border-[#3A5068]/60 relative overflow-hidden">
@@ -351,7 +360,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           </div>
 
           <div className="flex items-center gap-2">
-            {aiRec.estimatedDriveMinutes && (
+            {aiRec?.estimatedDriveMinutes && (
               <span className="text-xs text-[#00C46A] bg-[#006B3C]/30 px-2.5 py-1 rounded-lg border border-[#00C46A]/30 flex items-center gap-1 font-semibold">
                 <Clock className="w-3.5 h-3.5" />
                 <span>~{aiRec.estimatedDriveMinutes} min drive</span>
@@ -373,59 +382,67 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
         {/* Main Recommendation Content */}
         <div className="mt-4 pt-3 border-t border-[#2A5038]/70 relative z-10 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-[#00C46A] shrink-0" />
-              <span className="text-sm sm:text-base font-bold text-white">
-                {aiRec.recommendedStop}
-              </span>
-              <span
-                className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md ${
-                  aiRec.urgency === 'high'
-                    ? 'bg-rose-900/50 text-rose-300 border border-rose-500/40'
-                    : 'bg-emerald-900/50 text-emerald-300 border border-emerald-500/40'
-                }`}
-              >
-                {aiRec.urgency} Urgency
-              </span>
-            </div>
+          {aiRec ? (
+            <>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-[#00C46A] shrink-0" />
+                  <span className="text-sm sm:base font-bold text-white">
+                    {aiRec.recommendedStop}
+                  </span>
+                  <span
+                    className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md ${
+                      aiRec.urgency === 'high'
+                        ? 'bg-rose-900/50 text-rose-300 border border-rose-500/40'
+                        : 'bg-emerald-900/50 text-emerald-300 border border-emerald-500/40'
+                    }`}
+                  >
+                    {aiRec.urgency} Urgency
+                  </span>
+                </div>
 
-            <button
-              type="button"
-              onClick={() => onNavigate('orders')}
-              className="self-start sm:self-auto bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] font-bold px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-[#00C46A]/20 transition-transform active:scale-95"
-            >
-              <Compass className="w-3.5 h-3.5 text-[#0A1A0F]" />
-              <span>Navigate to Stop</span>
-            </button>
-          </div>
-
-          <p className="text-xs sm:text-sm text-[#D0E8F0] leading-relaxed">
-            {aiRec.reason}
-          </p>
-
-          {aiRec.batchSuggestion && (
-            <div className="bg-[#1A2E1C]/80 p-2.5 rounded-xl border border-[#2A5038] text-xs text-[#8899AA] flex items-start gap-2">
-              <Store className="w-4 h-4 text-[#00C46A] shrink-0 mt-0.5" />
-              <div>
-                <strong className="text-white">Route Efficiency: </strong>
-                <span className="text-[#D0E8F0]">{aiRec.batchSuggestion}</span>
-              </div>
-            </div>
-          )}
-
-          {aiRec.suggestedActions && aiRec.suggestedActions.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              <span className="text-[11px] font-semibold text-[#8899AA] mr-1">Action Items:</span>
-              {aiRec.suggestedActions.map((action, idx) => (
-                <span
-                  key={idx}
-                  className="bg-[#162719] text-[#D0E8F0] border border-[#2A5038] px-2.5 py-1 rounded-lg text-[11px] flex items-center gap-1"
+                <button
+                  type="button"
+                  onClick={() => onNavigate('orders')}
+                  className="self-start sm:self-auto bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] font-bold px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-[#00C46A]/20 transition-transform active:scale-95"
                 >
-                  <CheckCircle2 className="w-3 h-3 text-[#00C46A]" />
-                  <span>{action}</span>
-                </span>
-              ))}
+                  <Compass className="w-3.5 h-3.5 text-[#0A1A0F]" />
+                  <span>Navigate to Stop</span>
+                </button>
+              </div>
+
+              <p className="text-xs sm:text-sm text-[#D0E8F0] leading-relaxed">
+                {aiRec.reason}
+              </p>
+
+              {aiRec.batchSuggestion && (
+                <div className="bg-[#1A2E1C]/80 p-2.5 rounded-xl border border-[#2A5038] text-xs text-[#8899AA] flex items-start gap-2">
+                  <Store className="w-4 h-4 text-[#00C46A] shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-white">Route Efficiency: </strong>
+                    <span className="text-[#D0E8F0]">{aiRec.batchSuggestion}</span>
+                  </div>
+                </div>
+              )}
+
+              {aiRec.suggestedActions && aiRec.suggestedActions.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[11px] font-semibold text-[#8899AA] mr-1">Action Items:</span>
+                  {aiRec.suggestedActions.map((action, idx) => (
+                    <span
+                      key={idx}
+                      className="bg-[#162719] text-[#D0E8F0] border border-[#2A5038] px-2.5 py-1 rounded-lg text-[11px] flex items-center gap-1"
+                    >
+                      <CheckCircle2 className="w-3 h-3 text-[#00C46A]" />
+                      <span>{action}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="py-4 text-center text-xs text-[#8899AA]">
+              {isAiLoading ? 'Analyzing dispatch schedule and traffic conditions...' : 'No route recommendation available yet. Tap Re-Optimize to generate.'}
             </div>
           )}
         </div>

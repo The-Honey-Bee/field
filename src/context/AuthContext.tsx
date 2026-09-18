@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { UserProfile, UserRole } from '../types';
+import { UserProfile, UserRole, BiometricCredential } from '../types';
 import { supabase } from '../lib/supabase';
+import { webAuthnService } from '../services/webauthn';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -11,6 +12,8 @@ interface AuthContextType {
   isSupervisor: boolean;
   isManager: boolean;
   login: (email: string, password?: string, role?: UserRole) => Promise<{ success: boolean; error?: string }>;
+  loginWithBiometrics: (targetEmail?: string) => Promise<{ success: boolean; error?: string }>;
+  registerBiometrics: (deviceLabel?: string) => Promise<{ success: boolean; credential?: BiometricCredential; error?: string }>;
   signUp: (name: string, email: string, phone: string, password?: string, role?: UserRole) => Promise<{ success: boolean; error?: string }>;
   setRole: (role: UserRole) => Promise<void>;
   updateProfile: (updated: Partial<UserProfile>) => Promise<void>;
@@ -261,6 +264,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Biometric / WebAuthn Sign In
+  const loginWithBiometrics = async (
+    targetEmail?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const result = await webAuthnService.authenticateWithBiometrics(targetEmail);
+
+      if (!result.success || !result.user) {
+        const err = result.error || 'Biometric authentication was cancelled or failed.';
+        setError(err);
+        setLoading(false);
+        return { success: false, error: err };
+      }
+
+      setUser(result.user);
+      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(result.user));
+      setLoading(false);
+      return { success: true };
+    } catch (err: any) {
+      const msg = err?.message || 'Biometric authentication error.';
+      setError(msg);
+      setLoading(false);
+      return { success: false, error: msg };
+    }
+  };
+
+  // Biometric / WebAuthn Registration
+  const registerBiometrics = async (
+    deviceLabel?: string
+  ): Promise<{ success: boolean; credential?: BiometricCredential; error?: string }> => {
+    if (!user) {
+      return {
+        success: false,
+        error: 'You must be signed in to register biometric credentials.',
+      };
+    }
+
+    try {
+      const result = await webAuthnService.registerBiometricCredential(user, deviceLabel);
+      if (!result.success) {
+        return { success: false, error: result.error };
+      }
+      return { success: true, credential: result.credential };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message || 'Biometric registration encountered an error.',
+      };
+    }
+  };
+
   // Sign up implementation with Supabase Auth and database insert
   const signUp = async (
     name: string,
@@ -402,6 +459,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isSupervisor: role === 'supervisor' || role === 'manager',
         isManager: role === 'manager',
         login,
+        loginWithBiometrics,
+        registerBiometrics,
         signUp,
         setRole,
         updateProfile,

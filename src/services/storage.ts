@@ -1,4 +1,14 @@
-import { Product, Customer, Order, EodReport, ChatMessage, ActivityLogEntry, TimelineTask } from '../types';
+import {
+  Product,
+  Customer,
+  Order,
+  EodReport,
+  ChatMessage,
+  ActivityLogEntry,
+  TimelineTask,
+  UserProfile,
+  BiometricCredential,
+} from '../types';
 import { supabase } from '../lib/supabase';
 
 const STORAGE_KEYS = {
@@ -10,6 +20,8 @@ const STORAGE_KEYS = {
   TASKS: 'zamzam_tasks',
   OFFLINE_QUEUE: 'zamzam_offline_queue',
   USER_PREFS: 'zamzam_user_prefs',
+  USER_PROFILE: 'zamzam_user_profile',
+  BIOMETRICS: 'zamzam_biometric_credentials',
 };
 
 // Production catalog for Zamzam pure water products
@@ -301,6 +313,30 @@ class StorageService {
     } else {
       localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(user));
     }
+  }
+
+  // --- Biometric / WebAuthn Credentials ---
+  public getBiometricCredentials(): BiometricCredential[] {
+    const raw = localStorage.getItem(STORAGE_KEYS.BIOMETRICS);
+    if (!raw) return [];
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+
+  public saveBiometricCredential(cred: BiometricCredential): void {
+    const existing = this.getBiometricCredentials();
+    const filtered = existing.filter((c) => c.id !== cred.id);
+    filtered.push(cred);
+    localStorage.setItem(STORAGE_KEYS.BIOMETRICS, JSON.stringify(filtered));
+  }
+
+  public removeBiometricCredential(credentialId: string): void {
+    const existing = this.getBiometricCredentials();
+    const filtered = existing.filter((c) => c.id !== credentialId);
+    localStorage.setItem(STORAGE_KEYS.BIOMETRICS, JSON.stringify(filtered));
   }
 
   // --- EOD Reports ---

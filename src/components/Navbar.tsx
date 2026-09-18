@@ -4,6 +4,7 @@ import { storageService } from '../services/storage';
 import { Wifi, WifiOff, Bell, RefreshCw, ChevronDown, CheckCircle2, User, ShieldAlert, Database } from 'lucide-react';
 import { UserRole } from '../types';
 import { SupabaseStatusModal } from './SupabaseStatusModal';
+import { ThemeToggle } from './ThemeToggle';
 
 interface NavbarProps {
   currentView: string;
@@ -123,6 +124,9 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
             <Database className="w-3.5 h-3.5 text-[#00C46A]" />
             <span className="hidden sm:inline font-medium">Cloud DB</span>
           </button>
+
+          {/* High-Contrast Outdoor Sunlight / Dark Mode Toggle */}
+          <ThemeToggle variant="navbar" />
 
           {syncFeedback && (
             <div className="hidden lg:flex items-center gap-1 text-xs text-[#00C46A] animate-fade-in">

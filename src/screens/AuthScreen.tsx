@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
+import { webAuthnService, getBiometricPlatformLabel } from '../services/webauthn';
 import {
   Lock,
   Mail,
@@ -10,10 +11,14 @@ import {
   ShieldCheck,
   AlertCircle,
   RefreshCw,
+  Fingerprint,
+  Smartphone,
+  CheckCircle2,
 } from 'lucide-react';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 export const AuthScreen: React.FC = () => {
-  const { login, signUp, loading, error, clearError } = useAuth();
+  const { login, loginWithBiometrics, signUp, loading, error, clearError } = useAuth();
   const [isSignUp, setIsSignUp] = useState<boolean>(false);
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
@@ -21,10 +26,55 @@ export const AuthScreen: React.FC = () => {
   const [phone, setPhone] = useState<string>('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('field_staff');
   const [localMsg, setLocalMsg] = useState<string | null>(null);
+  const [localSuccessMsg, setLocalSuccessMsg] = useState<string | null>(null);
+
+  // Biometric state
+  const [isBiometricSupported, setIsBiometricSupported] = useState<boolean>(false);
+  const [isBiometricLoading, setIsBiometricLoading] = useState<boolean>(false);
+  const [hasRegisteredBiometrics, setHasRegisteredBiometrics] = useState<boolean>(false);
+  const [platformLabel, setPlatformLabel] = useState<string>('Biometric');
+
+  useEffect(() => {
+    const checkBiometrics = async () => {
+      const supported = webAuthnService.isSupported();
+      const hasHardware = await webAuthnService.isPlatformAuthenticatorAvailable();
+      setIsBiometricSupported(supported && hasHardware);
+      setHasRegisteredBiometrics(webAuthnService.hasRegisteredCredentials());
+      setPlatformLabel(getBiometricPlatformLabel());
+    };
+    checkBiometrics();
+  }, []);
+
+  // Check if specific email has biometrics enrolled
+  const emailHasBiometrics = email ? webAuthnService.hasRegisteredCredentials(email) : false;
+
+  const handleBiometricSignIn = async () => {
+    setLocalMsg(null);
+    setLocalSuccessMsg(null);
+    clearError();
+    setIsBiometricLoading(true);
+
+    try {
+      // If user has entered an email, pass it to filter credentials, otherwise try resident or any local credential
+      const target = email.trim() || undefined;
+      const res = await loginWithBiometrics(target);
+
+      if (res.success) {
+        setLocalSuccessMsg('Biometric authentication verified! Opening dashboard...');
+      } else {
+        setLocalMsg(res.error || 'Biometric verification cancelled or unavailable.');
+      }
+    } catch (err: any) {
+      setLocalMsg(err?.message || 'Biometric sensor error.');
+    } finally {
+      setIsBiometricLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalMsg(null);
+    setLocalSuccessMsg(null);
     clearError();
 
     if (!email.trim() || !password.trim()) {
@@ -50,7 +100,12 @@ export const AuthScreen: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A1A0F] text-[#D0E8F0] flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0A1A0F] text-[#D0E8F0] flex flex-col items-center justify-center p-4 relative">
+      {/* Top Bar with Outdoor Sunlight Mode Switch */}
+      <div className="absolute top-4 right-4 z-10">
+        <ThemeToggle variant="compact" showLabel={true} />
+      </div>
+
       <div className="max-w-md w-full space-y-6">
         {/* Brand Logo & Name */}
         <div className="text-center space-y-2">
@@ -80,6 +135,7 @@ export const AuthScreen: React.FC = () => {
               onClick={() => {
                 setIsSignUp(false);
                 setLocalMsg(null);
+                setLocalSuccessMsg(null);
                 clearError();
               }}
               className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
@@ -93,6 +149,7 @@ export const AuthScreen: React.FC = () => {
               onClick={() => {
                 setIsSignUp(true);
                 setLocalMsg(null);
+                setLocalSuccessMsg(null);
                 clearError();
               }}
               className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
@@ -104,9 +161,69 @@ export const AuthScreen: React.FC = () => {
           </div>
 
           {(error || localMsg) && (
-            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2">
+            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2 animate-fade-in">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
               <span>{error || localMsg}</span>
+            </div>
+          )}
+
+          {localSuccessMsg && (
+            <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fade-in">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+              <span>{localSuccessMsg}</span>
+            </div>
+          )}
+
+          {/* WebAuthn Biometric Instant Sign In */}
+          {!isSignUp && (
+            <div className="space-y-2">
+              <button
+                type="button"
+                id="btn-biometric-login"
+                onClick={handleBiometricSignIn}
+                disabled={loading || isBiometricLoading}
+                className="w-full relative overflow-hidden group bg-gradient-to-r from-[#006B3C] via-[#008F50] to-[#00C46A] hover:from-[#008F50] hover:to-[#00D674] text-white font-bold py-3.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2.5 shadow-lg shadow-[#006B3C]/30 border border-[#00C46A]/40 transition-all active:scale-[0.98] disabled:opacity-60"
+              >
+                {isBiometricLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-[#0A1A0F]" />
+                    <span className="text-[#0A1A0F] font-extrabold">Verifying Sensor ({platformLabel})...</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-1 rounded-lg bg-black/20 text-white">
+                      <Fingerprint className="w-4 h-4" />
+                    </div>
+                    <span className="text-white font-bold tracking-wide">
+                      {hasRegisteredBiometrics
+                        ? `Sign In with ${platformLabel}`
+                        : `One-Tap ${platformLabel} Sign In`}
+                    </span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center justify-between text-[11px] text-[#8899AA] px-1">
+                <span className="flex items-center gap-1">
+                  <Smartphone className="w-3 h-3 text-[#00C46A]" />
+                  <span>WebAuthn Biometric API</span>
+                </span>
+                {emailHasBiometrics ? (
+                  <span className="text-emerald-400 font-semibold flex items-center gap-0.5">
+                    <CheckCircle2 className="w-3 h-3" /> Enrolled on device
+                  </span>
+                ) : (
+                  <span className="text-[#64748B]">Fingerprint / Face ID</span>
+                )}
+              </div>
+
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-[#243447]"></div>
+                <span className="flex-shrink mx-3 text-[10px] text-[#8899AA] uppercase tracking-wider">
+                  Or continue with password
+                </span>
+                <div className="flex-grow border-t border-[#243447]"></div>
+              </div>
             </div>
           )}
 
@@ -209,7 +326,7 @@ export const AuthScreen: React.FC = () => {
           <div className="pt-2 text-center">
             <span className="text-[11px] text-[#8899AA] flex items-center justify-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-[#00C46A]" />
-              <span>Secure Cloud Authentication &bull; Supabase Engine</span>
+              <span>Hardware Passkey & FIDO2 WebAuthn Protected</span>
             </span>
           </div>
         </div>
@@ -217,4 +334,5 @@ export const AuthScreen: React.FC = () => {
     </div>
   );
 };
+
 
