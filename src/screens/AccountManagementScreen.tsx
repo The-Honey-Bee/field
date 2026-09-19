@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { storageService } from '../services/storage';
-import { webAuthnService, getBiometricPlatformLabel } from '../services/webauthn';
+import {
+  webAuthnService,
+  getBiometricPlatformLabel,
+  isMobileDevice,
+  getMobileDeviceInfo,
+} from '../services/webauthn';
 import { BiometricCredential } from '../types';
 import {
   User,
@@ -18,6 +23,10 @@ import {
   AlertCircle,
   Sparkles,
   Sun,
+  ShieldCheck,
+  Check,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
 
@@ -49,6 +58,15 @@ export const AccountManagementScreen: React.FC<AccountManagementScreenProps> = (
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [deviceNick, setDeviceNick] = useState<string>('');
   const [biometricFeedback, setBiometricFeedback] = useState<{ text: string; isError?: boolean } | null>(null);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState<boolean>(false);
+  const [deviceInfo, setDeviceInfo] = useState<ReturnType<typeof getMobileDeviceInfo>>({
+    isMobile: false,
+    os: 'other',
+    deviceModel: 'Mobile Phone',
+    biometricType: 'Fingerprint / Face ID',
+    label: 'Mobile Sensor',
+  });
 
   useEffect(() => {
     const checkPlatform = async () => {
@@ -56,6 +74,8 @@ export const AccountManagementScreen: React.FC<AccountManagementScreenProps> = (
       const hasHardware = await webAuthnService.isPlatformAuthenticatorAvailable();
       setBiometricsSupported(supported && hasHardware);
       setPlatformLabel(getBiometricPlatformLabel());
+      setIsMobile(isMobileDevice());
+      setDeviceInfo(getMobileDeviceInfo());
       refreshCredentials();
     };
     checkPlatform();
@@ -253,10 +273,47 @@ export const AccountManagementScreen: React.FC<AccountManagementScreenProps> = (
               <Smartphone className="w-3 h-3" />
               <span>
                 {biometricsSupported
-                  ? `${platformLabel} Supported`
+                  ? `${isMobile ? deviceInfo.deviceModel : platformLabel} Supported`
                   : 'Platform Sensor Not Detected'}
               </span>
             </span>
+          </div>
+        </div>
+
+        {/* Mobile Phone Biometrics Status Banner */}
+        <div className="bg-[#1A2E1C] p-3.5 rounded-xl border border-[#3A5068]/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-[#006B3C]/40 text-[#00C46A] border border-[#00C46A]/30 shrink-0">
+              <Smartphone className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-white">
+                  {deviceInfo.deviceModel} Biometrics
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#00C46A]/20 text-[#00C46A] border border-[#00C46A]/30 font-semibold uppercase">
+                  Mobile Allowed
+                </span>
+              </div>
+              <p className="text-[11px] text-[#8899AA] mt-0.5">
+                Sensor: <strong className="text-white">{deviceInfo.biometricType}</strong> &bull; Compatible with Android Fingerprint & Apple Face ID
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-center">
+            <button
+              type="button"
+              onClick={() => {
+                setDeviceNick(`${deviceInfo.deviceModel} (${deviceInfo.biometricType})`);
+                handleEnrollBiometrics();
+              }}
+              disabled={isEnrolling}
+              className="bg-gradient-to-r from-[#006B3C] to-[#00C46A] hover:from-[#008F50] hover:to-[#00D674] text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow transition-all disabled:opacity-50"
+            >
+              <Fingerprint className="w-3.5 h-3.5" />
+              <span>Enroll This Phone</span>
+            </button>
           </div>
         </div>
 
@@ -481,13 +538,118 @@ export const AccountManagementScreen: React.FC<AccountManagementScreenProps> = (
       {/* 4. Log Out */}
       <div className="pt-2 flex justify-center">
         <button
-          onClick={logout}
-          className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 p-3 rounded-xl border border-red-900/40 hover:bg-red-950/40 transition-colors"
+          type="button"
+          id="btn-signout-trigger"
+          onClick={() => setShowLogoutConfirm(true)}
+          className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 p-3 rounded-xl border border-red-900/40 hover:bg-red-950/40 transition-colors shadow-sm active:scale-95"
         >
           <LogOut className="w-4 h-4" />
           <span>Sign Out of Session</span>
         </button>
       </div>
+
+      {/* Logout Confirmation Dialog Modal */}
+      {showLogoutConfirm && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setShowLogoutConfirm(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="logout-dialog-title"
+        >
+          <div
+            className="bg-[#122010] border border-red-900/60 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-4 border-b border-[#2A5038] flex items-center justify-between bg-red-950/20">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 id="logout-dialog-title" className="text-sm font-bold text-white">
+                    Confirm Sign Out
+                  </h3>
+                  <span className="text-[11px] text-[#8899AA]">
+                    End current field staff session
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="w-8 h-8 rounded-lg bg-[#1A2E1C] hover:bg-[#253D28] text-[#8899AA] hover:text-white flex items-center justify-center transition-colors"
+                aria-label="Close dialog"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5 space-y-3.5 text-xs">
+              <p className="text-[#D0E8F0] leading-relaxed">
+                Are you sure you want to sign out? You will need your password or enrolled biometric passkey to log back in.
+              </p>
+
+              {/* Staff Profile Card */}
+              <div className="p-3 bg-[#1A2E1C] rounded-xl border border-[#3A5068]/40 space-y-1">
+                <div className="flex items-center justify-between text-white font-bold">
+                  <span>{user?.name || 'Field Staff'}</span>
+                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-[#00C46A]/20 text-[#00C46A] border border-[#00C46A]/30">
+                    {user?.role || 'operator'}
+                  </span>
+                </div>
+                <div className="text-[11px] text-[#8899AA]">
+                  ID: <span className="font-mono text-white">{user?.employeeId || 'N/A'}</span> &bull; {user?.email}
+                </div>
+              </div>
+
+              {/* Offline buffer notice if pending items exist */}
+              {(() => {
+                const pendingCount = storageService.getPendingSyncCount();
+                if (pendingCount > 0) {
+                  return (
+                    <div className="p-2.5 rounded-xl bg-amber-950/30 border border-amber-500/40 text-amber-300 text-[11px] flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <span>
+                        Notice: You have <strong>{pendingCount} unsynced record{pendingCount > 1 ? 's' : ''}</strong> in device storage. They will be preserved locally and will sync once reconnected.
+                      </span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 border-t border-[#2A5038] bg-[#0A1A0F]/60 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                id="btn-cancel-logout"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#8899AA] hover:text-white bg-[#1A2E1C] hover:bg-[#253D28] border border-[#3A5068] transition-all"
+              >
+                Cancel & Stay Signed In
+              </button>
+
+              <button
+                type="button"
+                id="btn-confirm-logout"
+                onClick={() => {
+                  setShowLogoutConfirm(false);
+                  logout();
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-500 active:scale-95 transition-all flex items-center gap-1.5 shadow-lg shadow-red-600/30"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Yes, Sign Out</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

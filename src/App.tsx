@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { Navbar } from './components/Navbar';
 import { Navigation } from './components/Navigation';
+import { OfflineSyncBanner } from './components/OfflineSyncBanner';
+import { OfflineSyncModal } from './components/OfflineSyncModal';
 import { HomeScreen } from './screens/HomeScreen';
 import { OrderPaymentScreen } from './screens/OrderPaymentScreen';
 import { EodReportScreen } from './screens/EodReportScreen';
@@ -12,11 +14,13 @@ import { CustomerManagementScreen } from './screens/CustomerManagementScreen';
 import { DirectMessagingScreen } from './screens/DirectMessagingScreen';
 import { ActivityLogScreen } from './screens/ActivityLogScreen';
 import { AccountManagementScreen } from './screens/AccountManagementScreen';
+import { GoogleFormsScreen } from './screens/GoogleFormsScreen';
 import { AuthScreen } from './screens/AuthScreen';
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
   const [currentView, setCurrentView] = useState<string>('home');
+  const [showSyncModal, setShowSyncModal] = useState<boolean>(false);
 
   if (loading) {
     return (
@@ -41,6 +45,8 @@ const AppContent: React.FC = () => {
         return <OrderPaymentScreen onNavigate={setCurrentView} />;
       case 'reports':
         return <EodReportScreen onNavigate={setCurrentView} />;
+      case 'forms':
+        return <GoogleFormsScreen onNavigate={setCurrentView} />;
       case 'supervisor':
         return <SupervisorScreen onNavigate={setCurrentView} />;
       case 'analytics':
@@ -61,11 +67,14 @@ const AppContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#0A1A0F] text-[#D0E8F0] flex flex-col font-sans selection:bg-[#00C46A] selection:text-[#0A1A0F]">
       <Navbar currentView={currentView} onNavigate={setCurrentView} />
+      <OfflineSyncBanner onOpenSyncCenter={() => setShowSyncModal(true)} />
       <Navigation currentView={currentView} onNavigate={setCurrentView} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         {renderCurrentView()}
       </main>
+
+      <OfflineSyncModal isOpen={showSyncModal} onClose={() => setShowSyncModal(false)} />
     </div>
   );
 };

@@ -96,6 +96,7 @@ export interface Customer {
   address?: string;
   createdBy?: string;
   createdAt: string;
+  syncStatus?: 'synced' | 'pending' | 'failed';
 }
 
 export interface ChatMessage {

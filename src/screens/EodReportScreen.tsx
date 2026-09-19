@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { storageService } from '../services/storage';
 import { Order, EodReport, ProofImage } from '../types';
 import { CameraCaptureModal } from '../components/CameraCaptureModal';
+import { VoiceDictationInput } from '../components/VoiceDictationInput';
 import {
   FileText,
   CheckCircle2,
@@ -535,17 +536,14 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
           </div>
         )}
 
-        {/* Accompanying Notes */}
+        {/* Accompanying Notes with Google Web Speech Voice-to-Text Dictation */}
         <div className="pt-2 border-t border-[#243447]">
-          <label className="text-xs font-semibold text-white uppercase tracking-wider block mb-1.5">
-            Handover Remarks & Delivery Notes (Optional)
-          </label>
-          <textarea
-            rows={2}
+          <VoiceDictationInput
+            id="eod-field-observations"
+            label="Handover Remarks & Site Observations"
             value={fieldNotes}
-            onChange={(e) => setFieldNotes(e.target.value)}
-            placeholder="E.g., 65 empty bottles inspected & stored at depot bay. Van odometer 142,890 km, 20L diesel filled..."
-            className="w-full bg-[#1A2E1C] border border-[#3A5068] rounded-xl p-3 text-xs text-white placeholder-[#8899AA] focus:outline-none focus:border-[#00C46A]"
+            onChange={setFieldNotes}
+            placeholder="Dictate with microphone or type observations (e.g., 65 empty bottles inspected & returned to depot bay, van odometer 142,890 km, 20L diesel filled)..."
           />
         </div>
 

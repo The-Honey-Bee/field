@@ -24,6 +24,7 @@ import {
   MapPin,
   Compass,
   AlertCircle,
+  ClipboardList,
 } from 'lucide-react';
 
 interface AiRecommendation {
@@ -205,8 +206,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           </p>
         </div>
 
-        {/* Target Progress Card */}
-        <div className="flex items-center gap-4 bg-[#1A2E1C] px-4 py-3 rounded-xl border border-[#3A5068]/50">
+        {/* Target Progress Card & Google Forms Shortcut */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => onNavigate('forms')}
+            className="hidden sm:flex items-center gap-2 bg-[#122010] hover:bg-[#1A2E1C] border border-[#3A5068]/70 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-[#00C46A] hover:text-white transition-all shadow-xs"
+            title="Manage Google Forms and Customer Surveys"
+          >
+            <ClipboardList className="w-4 h-4" />
+            <span>Google Forms</span>
+          </button>
+
+          <div className="flex items-center gap-4 bg-[#1A2E1C] px-4 py-3 rounded-xl border border-[#3A5068]/50">
           <div className="text-right">
             <div className="text-[11px] text-[#8899AA]">Daily Target ({targetProgress}%)</div>
             <div className="text-sm font-bold text-white font-mono">
@@ -221,6 +232,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
             <Award className="w-5 h-5" />
           </button>
         </div>
+      </div>
       </div>
 
       {targetReached && (

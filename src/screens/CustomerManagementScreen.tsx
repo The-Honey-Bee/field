@@ -11,6 +11,7 @@ import {
   ShoppingCart,
   CheckCircle2,
   Building2,
+  ClipboardList,
 } from 'lucide-react';
 
 interface CustomerManagementScreenProps {
@@ -166,7 +167,15 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-[#243447] flex justify-end">
+              <div className="pt-2 border-t border-[#243447] flex items-center justify-between">
+                <button
+                  onClick={() => onNavigate('forms')}
+                  className="flex items-center gap-1.5 text-xs text-[#8899AA] hover:text-[#00C46A] transition-colors font-medium"
+                  title="Open Customer Satisfaction Survey in Google Forms"
+                >
+                  <ClipboardList className="w-3.5 h-3.5" />
+                  <span>Google Survey</span>
+                </button>
                 <button
                   onClick={() => onNavigate('orders')}
                   className="flex items-center gap-1.5 text-xs text-[#00C46A] hover:text-white font-semibold"

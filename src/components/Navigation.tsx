@@ -10,6 +10,7 @@ import {
   MessageSquare,
   History,
   User,
+  ClipboardList,
 } from 'lucide-react';
 
 interface NavigationProps {
@@ -24,6 +25,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate 
     { id: 'home', label: 'Home', icon: LayoutDashboard },
     { id: 'orders', label: 'New Order', icon: ShoppingCart },
     { id: 'reports', label: 'EOD Report', icon: FileText },
+    { id: 'forms', label: 'Google Forms', icon: ClipboardList },
     ...(isSupervisor ? [{ id: 'supervisor', label: 'Supervisor', icon: ShieldCheck }] : []),
     ...(isManager || isSupervisor ? [{ id: 'analytics', label: 'Analytics', icon: BarChart3 }] : []),
     { id: 'customers', label: 'Customers', icon: Users },

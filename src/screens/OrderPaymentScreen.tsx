@@ -113,7 +113,12 @@ export const OrderPaymentScreen: React.FC<OrderPaymentScreenProps> = ({ onNaviga
         colors: ['#00C46A', '#008F50', '#FFFFFF'],
       });
 
-      setSuccessMessage(`Order completed successfully for ${selectedCustomer}!`);
+      const isOnline = storageService.isOnline();
+      setSuccessMessage(
+        isOnline
+          ? `Order completed and synced to central cloud for ${selectedCustomer}!`
+          : `Order securely cached to local offline storage for ${selectedCustomer}. It will sync automatically when connection returns.`
+      );
 
       // Reset form
       setProducts((prev) => prev.map((p) => ({ ...p, quantity: 0 })));
@@ -123,10 +128,10 @@ export const OrderPaymentScreen: React.FC<OrderPaymentScreenProps> = ({ onNaviga
       setTimeout(() => {
         setSuccessMessage(null);
         onNavigate('home');
-      }, 2000);
+      }, 2500);
     } catch {
-      setSuccessMessage('Order saved in offline sync queue');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      setSuccessMessage('Order safely preserved in offline sync queue');
+      setTimeout(() => setSuccessMessage(null), 3500);
     } finally {
       setIsSubmitting(false);
     }

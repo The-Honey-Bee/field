@@ -10,6 +10,8 @@ import {
   BiometricCredential,
 } from '../types';
 import { supabase } from '../lib/supabase';
+import { offlineDb } from './offlineDb';
+import { requestBackgroundSync } from './serviceWorkerRegistration';
 
 const STORAGE_KEYS = {
   ORDERS: 'zamzam_orders',
@@ -22,6 +24,7 @@ const STORAGE_KEYS = {
   USER_PREFS: 'zamzam_user_prefs',
   USER_PROFILE: 'zamzam_user_profile',
   BIOMETRICS: 'zamzam_biometric_credentials',
+  LAST_SYNC: 'zamzam_last_sync_timestamp',
 };
 
 // Production catalog for Zamzam pure water products
@@ -91,25 +94,123 @@ purgeDemoMockData();
 
 class StorageService {
   private isOnlineStatus: boolean = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  private isSyncingInProgress: boolean = false;
   private listeners: Array<(online: boolean) => void> = [];
+  private syncListeners: Array<(isSyncing: boolean) => void> = [];
 
   constructor() {
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => this.handleNetworkChange(true));
       window.addEventListener('offline', () => this.handleNetworkChange(false));
-      // Background sync on boot
+      
+      // Auto-sync when window re-gains focus or comes back from sleep
+      window.addEventListener('focus', () => {
+        this.checkConnectivity();
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          this.checkConnectivity();
+        }
+      });
+
+      // Listen for Service Worker background sync notification
+      window.addEventListener('zamzam:sw-sync', () => {
+        console.log('[Storage] SW background sync event received');
+        this.syncPendingQueue();
+      });
+
+      // Initial dual-layer cache hydration
+      this.hydrateIndexedDb();
+
+      // Proactive connectivity and auto-sync check loop (every 20 seconds)
+      setInterval(() => {
+        this.checkConnectivity();
+        if (this.isOnlineStatus && this.getPendingSyncCount() > 0 && !this.isSyncingInProgress) {
+          this.syncPendingQueue();
+        }
+      }, 20000);
+
+      // Background cloud data fetch on boot
       this.fetchCustomersFromCloud();
       this.fetchOrdersFromCloud();
     }
   }
 
+  // Populate IndexedDB with existing local records for offline durability
+  private async hydrateIndexedDb() {
+    try {
+      const orders = this.getOrders();
+      for (const ord of orders) {
+        await offlineDb.put('orders', ord);
+      }
+      const customers = this.getCustomers();
+      for (const cust of customers) {
+        await offlineDb.put('customers', cust);
+      }
+      const reports = this.getReports();
+      for (const rep of reports) {
+        await offlineDb.put('eod_reports', rep);
+      }
+    } catch (err) {
+      console.warn('[Storage] Hydration error (non-fatal):', err);
+    }
+  }
+
+  public async checkConnectivity(): Promise<boolean> {
+    if (typeof window === 'undefined') return true;
+    if (!navigator.onLine) {
+      if (this.isOnlineStatus) this.handleNetworkChange(false);
+      return false;
+    }
+    try {
+      // Fast lightweight endpoint probe to verify actual end-to-end connectivity
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch('/api/health', {
+        method: 'GET',
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      const isActuallyOnline = res.ok;
+      if (isActuallyOnline !== this.isOnlineStatus) {
+        this.handleNetworkChange(isActuallyOnline);
+      }
+      return isActuallyOnline;
+    } catch {
+      if (this.isOnlineStatus) {
+        this.handleNetworkChange(false);
+      }
+      return false;
+    }
+  }
+
   private handleNetworkChange(online: boolean) {
+    const wasOffline = !this.isOnlineStatus;
     this.isOnlineStatus = online;
     this.listeners.forEach((fn) => fn(online));
     if (online) {
-      this.syncPendingQueue();
+      this.addActivityLog({
+        action: 'network_online',
+        entityType: 'network',
+        entityId: 'net-' + Date.now(),
+        description: 'Internet connection restored. Initiating automatic field data synchronization.',
+        status: 'success',
+      });
+      // Automatically sync cached records when coming back online
+      if (wasOffline || this.getPendingSyncCount() > 0) {
+        this.syncPendingQueue();
+      }
       this.fetchCustomersFromCloud();
       this.fetchOrdersFromCloud();
+    } else {
+      this.addActivityLog({
+        action: 'network_offline',
+        entityType: 'network',
+        entityId: 'net-' + Date.now(),
+        description: 'Internet connection lost. Offline-first local state and service worker caching active.',
+        status: 'warning',
+      });
     }
   }
 
@@ -120,8 +221,35 @@ class StorageService {
     };
   }
 
+  public onSyncStatusChange(callback: (isSyncing: boolean) => void) {
+    this.syncListeners.push(callback);
+    return () => {
+      this.syncListeners = this.syncListeners.filter((fn) => fn !== callback);
+    };
+  }
+
+  private notifySyncListeners(isSyncing: boolean) {
+    this.isSyncingInProgress = isSyncing;
+    this.syncListeners.forEach((fn) => fn(isSyncing));
+  }
+
   public isOnline(): boolean {
     return this.isOnlineStatus;
+  }
+
+  public isSyncing(): boolean {
+    return this.isSyncingInProgress;
+  }
+
+  public getLastSyncTime(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(STORAGE_KEYS.LAST_SYNC);
+  }
+
+  public setLastSyncTime(timestamp: string) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.LAST_SYNC, timestamp);
+    }
   }
 
   // --- Customers ---
@@ -159,30 +287,55 @@ class StorageService {
 
   public saveCustomer(customer: Omit<Customer, 'id' | 'createdAt'>): Customer {
     const customers = this.getCustomers();
+    const isOnline = this.isOnlineStatus;
     const newCustomer: Customer = {
       ...customer,
       id: 'cust-' + Date.now(),
       createdAt: new Date().toISOString(),
+      syncStatus: isOnline ? 'synced' : 'pending',
     };
     customers.unshift(newCustomer);
     localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
     
+    // Durable persistence into IndexedDB
+    offlineDb.put('customers', newCustomer);
+
     // Log activity
     this.addActivityLog({
       action: 'customer_created',
       entityType: 'customer',
       entityId: newCustomer.id,
-      description: `New customer registered: ${newCustomer.name}`,
+      description: `New customer registered: ${newCustomer.name} (${isOnline ? 'Direct Cloud' : 'Cached Offline'})`,
       status: 'success',
     });
 
-    // Try Supabase insert
-    if (this.isOnlineStatus) {
+    if (isOnline) {
       supabase.from('customers').insert({
         name: newCustomer.name,
         phone: newCustomer.phone,
-        address: newCustomer.address,
-      }).then(() => {}, () => {});
+        address: newCustomer.address || '',
+      }).then(
+        () => {},
+        (err) => {
+          console.warn('[Storage] Direct Supabase customer insert failed, queuing offline:', err);
+          newCustomer.syncStatus = 'pending';
+          localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
+          offlineDb.enqueue({
+            id: newCustomer.id,
+            entityType: 'customer',
+            action: 'create',
+            data: newCustomer,
+          });
+        }
+      );
+    } else {
+      offlineDb.enqueue({
+        id: newCustomer.id,
+        entityType: 'customer',
+        action: 'create',
+        data: newCustomer,
+      });
+      requestBackgroundSync();
     }
 
     return newCustomer;
@@ -191,6 +344,7 @@ class StorageService {
   public deleteCustomer(id: string) {
     const customers = this.getCustomers().filter((c) => c.id !== id);
     localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
+    offlineDb.delete('customers', id);
   }
 
   // --- Orders ---
@@ -224,6 +378,9 @@ class StorageService {
           status: o.status || 'pending',
         }));
         localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(cloudOrders));
+        for (const co of cloudOrders) {
+          offlineDb.put('orders', co);
+        }
         return cloudOrders;
       }
     } catch {
@@ -248,11 +405,14 @@ class StorageService {
     orders.unshift(order);
     localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
 
+    // Durable persistence in IndexedDB
+    await offlineDb.put('orders', order);
+
     this.addActivityLog({
       action: 'order_created',
       entityType: 'order',
       entityId: order.id,
-      description: `Order created for ${order.customerName} - TZS ${order.subtotal.toLocaleString()}`,
+      description: `Order created for ${order.customerName} - TZS ${order.subtotal.toLocaleString()} (${isOnline ? 'Online' : 'Saved to Local Cache'})`,
       status: 'success',
     });
 
@@ -270,8 +430,24 @@ class StorageService {
           created_at: order.createdAt,
         });
       } catch (err) {
-        console.warn('Direct supabase order insert failed, kept in local storage', err);
+        console.warn('Direct supabase order insert failed, queued to offline DB', err);
+        order.syncStatus = 'pending';
+        localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
+        await offlineDb.enqueue({
+          id: order.id,
+          entityType: 'order',
+          action: 'create',
+          data: order,
+        });
       }
+    } else {
+      await offlineDb.enqueue({
+        id: order.id,
+        entityType: 'order',
+        action: 'create',
+        data: order,
+      });
+      requestBackgroundSync();
     }
 
     return order;
@@ -365,11 +541,14 @@ class StorageService {
     reports.unshift(report);
     localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports));
 
+    // Durable persistence in IndexedDB
+    await offlineDb.put('eod_reports', report);
+
     this.addActivityLog({
       action: 'eod_submitted',
       entityType: 'eod_report',
       entityId: report.id,
-      description: `End of Day Report submitted - Total TZS ${report.totalRevenue.toLocaleString()} (${report.totalDeliveries} deliveries)`,
+      description: `End of Day Report submitted - Total TZS ${report.totalRevenue.toLocaleString()} (${report.totalDeliveries} deliveries, ${isOnline ? 'Direct Cloud' : 'Cached Offline'})`,
       status: 'success',
     });
 
@@ -388,8 +567,24 @@ class StorageService {
           created_at: report.createdAt,
         });
       } catch (err) {
-        console.warn('Supabase report submit failed, saved locally', err);
+        console.warn('Supabase report submit failed, saved locally and queued to offline DB', err);
+        report.syncStatus = 'pending';
+        localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports));
+        await offlineDb.enqueue({
+          id: report.id,
+          entityType: 'report',
+          action: 'create',
+          data: report,
+        });
       }
+    } else {
+      await offlineDb.enqueue({
+        id: report.id,
+        entityType: 'report',
+        action: 'create',
+        data: report,
+      });
+      requestBackgroundSync();
     }
 
     return report;
@@ -488,47 +683,179 @@ class StorageService {
     localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(logs.slice(0, 100)));
   }
 
-  // --- Sync Count ---
+  // --- Sync State & Queue Management ---
   public getPendingSyncCount(): number {
     const orders = this.getOrders();
     const reports = this.getReports();
+    const customers = this.getCustomers();
     const pendingOrders = orders.filter((o) => o.syncStatus === 'pending').length;
     const pendingReports = reports.filter((r) => r.syncStatus === 'pending').length;
-    return pendingOrders + pendingReports;
+    const pendingCustomers = customers.filter((c) => c.syncStatus === 'pending').length;
+    return pendingOrders + pendingReports + pendingCustomers;
   }
 
-  public async syncPendingQueue(): Promise<number> {
-    const orders = this.getOrders();
-    let syncedCount = 0;
-    let modified = false;
+  public getPendingSyncDetails() {
+    const orders = this.getOrders().filter((o) => o.syncStatus === 'pending');
+    const reports = this.getReports().filter((r) => r.syncStatus === 'pending');
+    const customers = this.getCustomers().filter((c) => c.syncStatus === 'pending');
+    return {
+      pendingOrders: orders,
+      pendingReports: reports,
+      pendingCustomers: customers,
+      totalPending: orders.length + reports.length + customers.length,
+      lastSyncTime: this.getLastSyncTime(),
+    };
+  }
 
-    for (const order of orders) {
-      if (order.syncStatus === 'pending') {
-        try {
-          await supabase.from('orders').insert({
-            customer_name: order.customerName,
-            payment_method: order.paymentMethod,
-            items: order.items,
-            subtotal: order.subtotal,
-            amount_received: order.amountReceived,
-            change_amount: order.changeAmount,
-            sync_status: 'synced',
-            created_at: order.createdAt,
-          });
-          order.syncStatus = 'synced';
-          syncedCount++;
-          modified = true;
-        } catch {
-          // Keep as pending
+  public async forceSyncAll(): Promise<{
+    success: boolean;
+    syncedOrders: number;
+    syncedCustomers: number;
+    syncedReports: number;
+    total: number;
+    error?: string;
+  }> {
+    const isActuallyOnline = await this.checkConnectivity();
+    if (!isActuallyOnline) {
+      return {
+        success: false,
+        syncedOrders: 0,
+        syncedCustomers: 0,
+        syncedReports: 0,
+        total: 0,
+        error: 'Device is offline or server cannot be reached. Cached field data remains safely preserved locally.',
+      };
+    }
+    const res = await this.syncPendingQueue();
+    return {
+      success: true,
+      ...res,
+    };
+  }
+
+  public async syncPendingQueue(): Promise<{
+    syncedOrders: number;
+    syncedCustomers: number;
+    syncedReports: number;
+    total: number;
+  }> {
+    if (this.isSyncingInProgress) {
+      return { syncedOrders: 0, syncedCustomers: 0, syncedReports: 0, total: 0 };
+    }
+    this.notifySyncListeners(true);
+
+    let syncedOrders = 0;
+    let syncedCustomers = 0;
+    let syncedReports = 0;
+
+    try {
+      // 1. Sync Pending Customers first
+      const customers = this.getCustomers();
+      let customersModified = false;
+      for (const customer of customers) {
+        if (customer.syncStatus === 'pending') {
+          try {
+            await supabase.from('customers').insert({
+              name: customer.name,
+              phone: customer.phone,
+              address: customer.address || '',
+            });
+            customer.syncStatus = 'synced';
+            syncedCustomers++;
+            customersModified = true;
+            await offlineDb.removeQueueItem(customer.id);
+            await offlineDb.put('customers', customer);
+          } catch (err: any) {
+            console.warn(`[Sync] Customer ${customer.name} upload error:`, err);
+            await offlineDb.recordQueueFailure(customer.id, err?.message || 'Sync failed');
+          }
         }
       }
-    }
+      if (customersModified) {
+        localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
+      }
 
-    if (modified) {
-      localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
-    }
+      // 2. Sync Pending Orders
+      const orders = this.getOrders();
+      let ordersModified = false;
+      for (const order of orders) {
+        if (order.syncStatus === 'pending') {
+          try {
+            await supabase.from('orders').insert({
+              customer_name: order.customerName,
+              payment_method: order.paymentMethod,
+              items: order.items,
+              subtotal: order.subtotal,
+              amount_received: order.amountReceived,
+              change_amount: order.changeAmount,
+              sync_status: 'synced',
+              status: order.status || 'pending',
+              created_at: order.createdAt,
+            });
+            order.syncStatus = 'synced';
+            syncedOrders++;
+            ordersModified = true;
+            await offlineDb.removeQueueItem(order.id);
+            await offlineDb.put('orders', order);
+          } catch (err: any) {
+            console.warn(`[Sync] Order ${order.id} upload error:`, err);
+            await offlineDb.recordQueueFailure(order.id, err?.message || 'Sync failed');
+          }
+        }
+      }
+      if (ordersModified) {
+        localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
+      }
 
-    return syncedCount;
+      // 3. Sync Pending EOD Reports
+      const reports = this.getReports();
+      let reportsModified = false;
+      for (const report of reports) {
+        if (report.syncStatus === 'pending') {
+          try {
+            await supabase.from('eod_reports').insert({
+              staff_id: report.staffId,
+              total_revenue: report.totalRevenue,
+              total_deliveries: report.totalDeliveries,
+              delivered_count: report.deliveredCount,
+              collected_count: report.collectedCount,
+              partial_count: report.partialCount,
+              deliveries: report.deliveries,
+              field_notes: report.fieldNotes,
+              sync_status: 'submitted',
+              created_at: report.createdAt,
+            });
+            report.syncStatus = 'submitted';
+            syncedReports++;
+            reportsModified = true;
+            await offlineDb.removeQueueItem(report.id);
+            await offlineDb.put('eod_reports', report);
+          } catch (err: any) {
+            console.warn(`[Sync] EOD Report ${report.id} upload error:`, err);
+            await offlineDb.recordQueueFailure(report.id, err?.message || 'Sync failed');
+          }
+        }
+      }
+      if (reportsModified) {
+        localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports));
+      }
+
+      const total = syncedOrders + syncedCustomers + syncedReports;
+      if (total > 0) {
+        this.setLastSyncTime(new Date().toISOString());
+        this.addActivityLog({
+          action: 'sync_completed',
+          entityType: 'sync',
+          entityId: 'sync-' + Date.now(),
+          description: `Field auto-sync completed: ${total} item(s) pushed to central database`,
+          status: 'success',
+        });
+      }
+
+      return { syncedOrders, syncedCustomers, syncedReports, total };
+    } finally {
+      this.notifySyncListeners(false);
+    }
   }
 }
 

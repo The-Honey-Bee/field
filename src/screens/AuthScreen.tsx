@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
-import { webAuthnService, getBiometricPlatformLabel } from '../services/webauthn';
+import {
+  webAuthnService,
+  getBiometricPlatformLabel,
+  isMobileDevice,
+  getMobileDeviceInfo,
+} from '../services/webauthn';
 import {
   Lock,
   Mail,
@@ -14,6 +19,7 @@ import {
   Fingerprint,
   Smartphone,
   CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
 
@@ -28,11 +34,19 @@ export const AuthScreen: React.FC = () => {
   const [localMsg, setLocalMsg] = useState<string | null>(null);
   const [localSuccessMsg, setLocalSuccessMsg] = useState<string | null>(null);
 
-  // Biometric state
+  // Biometric & Mobile state
   const [isBiometricSupported, setIsBiometricSupported] = useState<boolean>(false);
   const [isBiometricLoading, setIsBiometricLoading] = useState<boolean>(false);
   const [hasRegisteredBiometrics, setHasRegisteredBiometrics] = useState<boolean>(false);
   const [platformLabel, setPlatformLabel] = useState<string>('Biometric');
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [deviceInfo, setDeviceInfo] = useState<ReturnType<typeof getMobileDeviceInfo>>({
+    isMobile: false,
+    os: 'other',
+    deviceModel: 'Device',
+    biometricType: 'Biometric Sensor',
+    label: 'Biometrics',
+  });
 
   useEffect(() => {
     const checkBiometrics = async () => {
@@ -41,6 +55,8 @@ export const AuthScreen: React.FC = () => {
       setIsBiometricSupported(supported && hasHardware);
       setHasRegisteredBiometrics(webAuthnService.hasRegisteredCredentials());
       setPlatformLabel(getBiometricPlatformLabel());
+      setIsMobile(isMobileDevice());
+      setDeviceInfo(getMobileDeviceInfo());
     };
     checkBiometrics();
   }, []);
@@ -195,27 +211,37 @@ export const AuthScreen: React.FC = () => {
                       <Fingerprint className="w-4 h-4" />
                     </div>
                     <span className="text-white font-bold tracking-wide">
-                      {hasRegisteredBiometrics
-                        ? `Sign In with ${platformLabel}`
-                        : `One-Tap ${platformLabel} Sign In`}
+                      Quick Sign-in
                     </span>
                   </>
                 )}
               </button>
 
               <div className="flex items-center justify-between text-[11px] text-[#8899AA] px-1">
-                <span className="flex items-center gap-1">
-                  <Smartphone className="w-3 h-3 text-[#00C46A]" />
-                  <span>WebAuthn Biometric API</span>
+                <span className="flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-[#00C46A]" />
+                  <span>{isMobile ? `${deviceInfo.deviceModel} Sensor` : 'WebAuthn Passkey API'}</span>
                 </span>
                 {emailHasBiometrics ? (
-                  <span className="text-emerald-400 font-semibold flex items-center gap-0.5">
-                    <CheckCircle2 className="w-3 h-3" /> Enrolled on device
+                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Enrolled on this phone
                   </span>
                 ) : (
-                  <span className="text-[#64748B]">Fingerprint / Face ID</span>
+                  <span className="text-[#8899AA] flex items-center gap-1">
+                    <Fingerprint className="w-3 h-3 text-[#00C46A]" />
+                    <span>{deviceInfo.biometricType}</span>
+                  </span>
                 )}
               </div>
+
+              {isMobile && !hasRegisteredBiometrics && (
+                <div className="bg-[#1A2E1C]/90 border border-[#2A5038] p-2.5 rounded-xl text-[11px] text-[#D0E8F0] flex items-start gap-2">
+                  <Smartphone className="w-4 h-4 text-[#00C46A] shrink-0 mt-0.5" />
+                  <p className="leading-tight">
+                    <strong className="text-white">Mobile Biometrics Ready:</strong> Sign in once with your staff account to enroll your phone's {deviceInfo.biometricType} for instant 1-tap field sign-in.
+                  </p>
+                </div>
+              )}
 
               <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-[#243447]"></div>

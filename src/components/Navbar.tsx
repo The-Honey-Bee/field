@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { storageService } from '../services/storage';
-import { Wifi, WifiOff, Bell, RefreshCw, ChevronDown, CheckCircle2, User, ShieldAlert, Database } from 'lucide-react';
+import { Wifi, WifiOff, Bell, RefreshCw, ChevronDown, CheckCircle2, User, ShieldAlert, Database, Cloud } from 'lucide-react';
 import { UserRole } from '../types';
 import { SupabaseStatusModal } from './SupabaseStatusModal';
+import { OfflineSyncModal } from './OfflineSyncModal';
 import { ThemeToggle } from './ThemeToggle';
 
 interface NavbarProps {
@@ -15,33 +16,43 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
   const { user, role, setRole, logout } = useAuth();
   const [isOnline, setIsOnline] = useState<boolean>(storageService.isOnline());
   const [pendingCount, setPendingCount] = useState<number>(storageService.getPendingSyncCount());
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(storageService.isSyncing());
   const [showRoleMenu, setShowRoleMenu] = useState<boolean>(false);
   const [showNotifMenu, setShowNotifMenu] = useState<boolean>(false);
   const [showDbModal, setShowDbModal] = useState<boolean>(false);
+  const [showSyncModal, setShowSyncModal] = useState<boolean>(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub = storageService.onNetworkChange((online) => {
+    const unsubNet = storageService.onNetworkChange((online) => {
       setIsOnline(online);
       setPendingCount(storageService.getPendingSyncCount());
     });
-    return unsub;
+    const unsubSync = storageService.onSyncStatusChange((syncing) => {
+      setIsSyncing(syncing);
+      setPendingCount(storageService.getPendingSyncCount());
+    });
+    return () => {
+      unsubNet();
+      unsubSync();
+    };
   }, []);
 
-  const handleManualSync = async () => {
+  const handleManualSync = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (isSyncing) return;
-    setIsSyncing(true);
     try {
-      const synced = await storageService.syncPendingQueue();
+      const res = await storageService.forceSyncAll();
       setPendingCount(storageService.getPendingSyncCount());
-      setSyncFeedback(synced > 0 ? `Synced ${synced} record(s)` : 'All records up to date');
+      if (res.success) {
+        setSyncFeedback(res.total > 0 ? `Synced ${res.total} record(s)` : 'All records up to date');
+      } else {
+        setSyncFeedback(res.error || 'Sync deferred locally');
+      }
       setTimeout(() => setSyncFeedback(null), 3000);
     } catch {
-      setSyncFeedback('Sync queued locally');
+      setSyncFeedback('Sync saved locally');
       setTimeout(() => setSyncFeedback(null), 3000);
-    } finally {
-      setIsSyncing(false);
     }
   };
 
@@ -86,7 +97,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
         {/* Right Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Sync Status Badge & Action */}
-          <div className="flex items-center gap-1.5 bg-[#122010] border border-[#3A5068] px-2.5 py-1.5 rounded-full text-xs">
+          <div
+            onClick={() => setShowSyncModal(true)}
+            className="flex items-center gap-1.5 bg-[#122010] hover:bg-[#1A2E1C] border border-[#3A5068] px-2.5 py-1.5 rounded-full text-xs cursor-pointer transition-colors"
+            title="Open Offline Persistence & Sync Center"
+          >
             {isOnline ? (
               <span className="flex items-center gap-1 text-[#00C46A]">
                 <Wifi className="w-3.5 h-3.5" />
@@ -108,7 +123,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
             <button
               onClick={handleManualSync}
               disabled={isSyncing}
-              title="Force Sync"
+              title="Force Sync Now"
               className="text-[#8899AA] hover:text-[#00C46A] transition-colors ml-0.5 p-0.5 rounded focus:outline-none"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-[#00C46A]' : ''}`} />
@@ -230,6 +245,12 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
       <SupabaseStatusModal
         isOpen={showDbModal}
         onClose={() => setShowDbModal(false)}
+      />
+
+      {/* Offline Persistence & Sync Center Modal */}
+      <OfflineSyncModal
+        isOpen={showSyncModal}
+        onClose={() => setShowSyncModal(false)}
       />
     </header>
   );
