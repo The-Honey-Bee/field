@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { storageService } from '../services/storage';
 import { Order, EodReport, ProofImage } from '../types';
 import { CameraCaptureModal } from '../components/CameraCaptureModal';
@@ -34,6 +35,7 @@ interface EodReportScreenProps {
 
 export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) => {
   const { user } = useAuth();
+  const { t, isSwahili } = useLanguage();
   const [orders, setOrders] = useState<Order[]>([]);
   const [fieldNotes, setFieldNotes] = useState<string>('');
   const [proofImages, setProofImages] = useState<ProofImage[]>([]);
@@ -219,10 +221,10 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
             <FileText className="w-6 h-6 text-[#00C46A]" />
-            <span>End-of-Day (EOD) Reconciliation</span>
+            <span>{t('eod.title', 'End-of-Day (EOD) Reconciliation')}</span>
           </h1>
           <p className="text-xs text-[#8899AA] mt-0.5">
-            Shift reconciliation, visual proof verification, cash tally, and supervisor sign-off.
+            {t('eod.desc', 'Shift reconciliation, visual proof verification, cash tally, and supervisor sign-off.')}
           </p>
         </div>
 
@@ -232,14 +234,14 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
             className="flex items-center gap-1.5 bg-[#122010] hover:bg-[#1A2E1C] border border-[#3A5068] text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all"
           >
             <Download className="w-3.5 h-3.5 text-[#00C46A]" />
-            <span>Export CSV</span>
+            <span>{t('eod.export_csv', 'Export CSV')}</span>
           </button>
           <button
             onClick={handlePrint}
             className="flex items-center gap-1.5 bg-[#122010] hover:bg-[#1A2E1C] border border-[#3A5068] text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all"
           >
             <Printer className="w-3.5 h-3.5 text-[#8899AA]" />
-            <span>Print</span>
+            <span>{t('eod.print', 'Print')}</span>
           </button>
         </div>
       </div>
@@ -250,7 +252,7 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
             <div className="flex items-center gap-3">
               <CheckCircle2 className="w-5 h-5 text-[#00C46A] shrink-0" />
               <div>
-                <div className="font-bold">EOD Report Submitted to Dispatch</div>
+                <div className="font-bold">{t('eod.submitted_title', 'EOD Report Submitted to Dispatch')}</div>
                 <div className="text-xs text-[#8899AA] mt-0.5">
                   Reference ID: <span className="font-mono text-white">{submittedReport.id}</span> &bull; Status:{' '}
                   <span className="uppercase text-[#00C46A] font-bold">{submittedReport.syncStatus}</span>
@@ -258,13 +260,13 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
               </div>
             </div>
             <span className="text-[11px] bg-[#00C46A]/20 text-[#00C46A] px-2.5 py-1 rounded-full font-bold">
-              {submittedReport.proofImages?.length || 0} Visual Proofs Attached
+              {submittedReport.proofImages?.length || 0} {t('eod.proofs_attached', 'Visual Proofs Attached')}
             </span>
           </div>
 
           {submittedReport.proofImages && submittedReport.proofImages.length > 0 && (
             <div className="pt-2 border-t border-[#00C46A]/30">
-              <div className="text-[11px] text-[#8899AA] font-semibold mb-2">Attached Proof Records:</div>
+              <div className="text-[11px] text-[#8899AA] font-semibold mb-2">{t('eod.attached_records', 'Attached Proof Records:')}</div>
               <div className="flex flex-wrap gap-2">
                 {submittedReport.proofImages.map((proof) => (
                   <button
@@ -293,30 +295,30 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
       {/* 1. KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038]">
-          <div className="text-[11px] text-[#8899AA] uppercase font-semibold">Total Revenue</div>
+          <div className="text-[11px] text-[#8899AA] uppercase font-semibold">{t('eod.total_revenue', 'Total Revenue')}</div>
           <div className="text-lg font-bold font-mono text-[#00C46A] mt-1">
             TZS {totalRevenue.toLocaleString()}
           </div>
         </div>
 
         <div className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038]">
-          <div className="text-[11px] text-[#8899AA] uppercase font-semibold">Total Deliveries</div>
+          <div className="text-[11px] text-[#8899AA] uppercase font-semibold">{t('eod.total_deliveries', 'Total Deliveries')}</div>
           <div className="text-lg font-bold font-mono text-white mt-1">
-            {totalDeliveries} stops
+            {totalDeliveries} {t('eod.stops', 'stops')}
           </div>
         </div>
 
         <div className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038]">
-          <div className="text-[11px] text-[#8899AA] uppercase font-semibold">Collections Verified</div>
+          <div className="text-[11px] text-[#8899AA] uppercase font-semibold">{t('eod.collections_verified', 'Collections Verified')}</div>
           <div className="text-lg font-bold font-mono text-white mt-1">
-            {collectedCount} accounts
+            {collectedCount} {t('eod.accounts', 'accounts')}
           </div>
         </div>
 
         <div className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038]">
-          <div className="text-[11px] text-[#8899AA] uppercase font-semibold">Bottles Empties In</div>
+          <div className="text-[11px] text-[#8899AA] uppercase font-semibold">{t('eod.bottles_empties_in', 'Bottles Empties In')}</div>
           <div className="text-lg font-bold font-mono text-white mt-1">
-            65 units
+            65 {t('eod.units', 'units')}
           </div>
         </div>
       </div>
@@ -326,14 +328,14 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-white flex items-center gap-2">
             <Truck className="w-4 h-4 text-[#00C46A]" />
-            <span>Shift Delivery Logs</span>
+            <span>{t('eod.shift_logs', 'Shift Delivery Logs')}</span>
           </h2>
-          <span className="text-xs text-[#8899AA] font-mono">{orders.length} orders recorded</span>
+          <span className="text-xs text-[#8899AA] font-mono">{orders.length} {t('eod.orders_recorded', 'orders recorded')}</span>
         </div>
 
         {orders.length === 0 ? (
           <div className="text-center py-8 text-xs text-[#8899AA]">
-            No delivery orders recorded for this shift yet.
+            {t('eod.no_orders', 'No delivery orders recorded for this shift yet.')}
           </div>
         ) : (
           <div className="divide-y divide-[#243447]">
@@ -355,7 +357,7 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
                     TZS {order.subtotal.toLocaleString()}
                   </div>
                   <span className="inline-block mt-1 text-[10px] bg-[#006B3C]/40 text-[#00C46A] font-semibold px-2 py-0.5 rounded">
-                    Delivered
+                    {t('eod.delivered', 'Delivered')}
                   </span>
                 </div>
               </div>
@@ -371,13 +373,13 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
             <div>
               <label className="text-sm font-bold text-white flex items-center gap-2">
                 <Camera className="w-4 h-4 text-[#00C46A]" />
-                <span>Visual Proof & Vehicle Inventory Handover</span>
+                <span>{t('eod.visual_proof_title', 'Visual Proof & Vehicle Inventory Handover')}</span>
                 <span className="bg-[#00C46A]/20 text-[#00C46A] text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
-                  Field Staff Upload
+                  {t('eod.field_staff_upload', 'Field Staff Upload')}
                 </span>
               </label>
               <p className="text-xs text-[#8899AA] mt-1">
-                Provide visual evidence for supervisor verification: empty bottle counts, vehicle odometer, fuel vouchers, or warehouse receiving slips.
+                {t('eod.visual_proof_desc', 'Provide visual evidence for supervisor verification: empty bottle counts, vehicle odometer, fuel vouchers, or warehouse receiving slips.')}
               </p>
             </div>
           </div>
@@ -400,10 +402,10 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
 
             <div>
               <div className="text-sm font-bold text-white group-hover:text-[#00C46A] transition-colors">
-                {isDragging ? 'Drop images here to attach' : 'Click to select or drag & drop visual proofs'}
+                {isDragging ? t('eod.drop_images', 'Drop images here to attach') : t('eod.drag_or_click', 'Click to select or drag & drop visual proofs')}
               </div>
               <p className="text-xs text-[#8899AA] mt-1">
-                Supports JPG, PNG, WebP or camera capture (Up to 10MB per photo)
+                {t('eod.supported_formats', 'Supports JPG, PNG, WebP or camera capture (Up to 10MB per photo)')}
               </p>
             </div>
 
@@ -413,7 +415,6 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
                 type="button"
                 id="btn-take-photo-camera"
                 onClick={() => {
-                  // If browser supports getUserMedia, open live viewfinder modal; otherwise trigger OS native camera input directly
                   if (typeof navigator !== 'undefined' && navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
                     setIsCameraOpen(true);
                   } else {
@@ -423,7 +424,7 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
                 className="flex items-center gap-2 bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-lg shadow-[#00C46A]/20 hover:scale-[1.02] active:scale-95"
               >
                 <Camera className="w-4 h-4 text-[#0A1A0F]" />
-                <span>Take Photo (Camera)</span>
+                <span>{t('eod.take_photo', 'Take Photo (Camera)')}</span>
               </button>
 
               {/* Browse Files Button */}
@@ -434,7 +435,7 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
                 className="flex items-center gap-1.5 bg-[#1A2E1C] hover:bg-[#253D28] text-white px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all border border-[#2A5038]"
               >
                 <ImageIcon className="w-3.5 h-3.5 text-[#00C46A]" />
-                <span>Browse Files</span>
+                <span>{t('eod.browse_files', 'Browse Files')}</span>
               </button>
 
               {/* Direct OS Native Camera Trigger Fallback */}
@@ -446,7 +447,7 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
                 title="Directly trigger device built-in camera app"
               >
                 <Camera className="w-3.5 h-3.5 text-[#00C46A]" />
-                <span>Native App</span>
+                <span>{t('eod.native_app', 'Native App')}</span>
               </button>
             </div>
           </div>
@@ -458,9 +459,9 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
             <div className="flex items-center justify-between text-xs">
               <div className="font-semibold text-white flex items-center gap-2">
                 <Check className="w-4 h-4 text-[#00C46A]" />
-                <span>Attached Visual Evidence ({proofImages.length})</span>
+                <span>{t('eod.attached_evidence', 'Attached Visual Evidence')} ({proofImages.length})</span>
               </div>
-              <span className="text-[#8899AA]">Click preview to inspect full size</span>
+              <span className="text-[#8899AA]">{t('eod.click_inspect', 'Click preview to inspect full size')}</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -511,7 +512,7 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
                         {proof.name}
                       </div>
                       <div className="text-[11px] text-[#8899AA] mt-0.5">
-                        Verification Category:
+                        {t('eod.category_label', 'Verification Category:')}
                       </div>
                     </div>
 
@@ -522,12 +523,12 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
                       }
                       className="w-full bg-[#1A2E1C] border border-[#2A5038] text-white text-[11px] rounded-lg p-1.5 focus:outline-none focus:border-[#00C46A]"
                     >
-                      <option value="bottles">Empty Bottles Return Tally</option>
-                      <option value="odometer">Vehicle Odometer Reading</option>
-                      <option value="fuel">Fuel Expense Voucher</option>
-                      <option value="receipt">Signed Delivery Challan</option>
-                      <option value="damage">Bottle Damage / Leakage</option>
-                      <option value="other">General Field Proof</option>
+                      <option value="bottles">{t('eod.cat_bottles', 'Empty Bottles Return Tally')}</option>
+                      <option value="odometer">{t('eod.cat_odometer', 'Vehicle Odometer Reading')}</option>
+                      <option value="fuel">{t('eod.cat_fuel', 'Fuel Expense Voucher')}</option>
+                      <option value="receipt">{t('eod.cat_receipt', 'Signed Delivery Challan')}</option>
+                      <option value="damage">{t('eod.cat_damage', 'Bottle Damage / Leakage')}</option>
+                      <option value="other">{t('eod.cat_other', 'General Field Proof')}</option>
                     </select>
                   </div>
                 </div>
@@ -540,10 +541,10 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
         <div className="pt-2 border-t border-[#243447]">
           <VoiceDictationInput
             id="eod-field-observations"
-            label="Handover Remarks & Site Observations"
+            label={t('eod.handover_remarks', 'Handover Remarks & Site Observations')}
             value={fieldNotes}
             onChange={setFieldNotes}
-            placeholder="Dictate with microphone or type observations (e.g., 65 empty bottles inspected & returned to depot bay, van odometer 142,890 km, 20L diesel filled)..."
+            placeholder={t('eod.remarks_placeholder', 'Dictate with microphone or type observations (e.g., 65 empty bottles inspected & returned to depot bay, van odometer 142,890 km, 20L diesel filled)...')}
           />
         </div>
 
@@ -557,10 +558,10 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
           <Send className="w-4 h-4" />
           <span>
             {isSubmitting
-              ? 'Submitting to Central Dispatch...'
-              : `Sign & Submit EOD Report with ${proofImages.length} Proof${
-                  proofImages.length === 1 ? '' : 's'
-                }`}
+              ? t('eod.submitting', 'Submitting to Central Dispatch...')
+              : isSwahili
+              ? `Weka Sahihi na Tuma Ripoti ya Siku yenye Ushahidi ${proofImages.length}`
+              : `Sign & Submit EOD Report with ${proofImages.length} Proof${proofImages.length === 1 ? '' : 's'}`}
           </span>
         </button>
       </div>

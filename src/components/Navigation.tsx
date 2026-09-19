@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -20,18 +21,19 @@ interface NavigationProps {
 
 export const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
   const { isSupervisor, isManager } = useAuth();
+  const { isSwahili } = useLanguage();
 
   const navItems = [
-    { id: 'home', label: 'Home', icon: LayoutDashboard },
-    { id: 'orders', label: 'New Order', icon: ShoppingCart },
-    { id: 'reports', label: 'EOD Report', icon: FileText },
-    { id: 'forms', label: 'Google Forms', icon: ClipboardList },
-    ...(isSupervisor ? [{ id: 'supervisor', label: 'Supervisor', icon: ShieldCheck }] : []),
-    ...(isManager || isSupervisor ? [{ id: 'analytics', label: 'Analytics', icon: BarChart3 }] : []),
-    { id: 'customers', label: 'Customers', icon: Users },
-    { id: 'messages', label: 'Chat', icon: MessageSquare },
-    { id: 'activity', label: 'Logs', icon: History },
-    { id: 'account', label: 'Account', icon: User },
+    { id: 'home', label: isSwahili ? 'Mwanzo' : 'Home', icon: LayoutDashboard },
+    { id: 'orders', label: isSwahili ? 'Agizo Jipya' : 'New Order', icon: ShoppingCart },
+    { id: 'reports', label: isSwahili ? 'Ripoti ya Siku' : 'EOD Report', icon: FileText },
+    { id: 'forms', label: isSwahili ? 'Fomu za Google' : 'Google Forms', icon: ClipboardList },
+    ...(isSupervisor ? [{ id: 'supervisor', label: isSwahili ? 'Msimamizi' : 'Supervisor', icon: ShieldCheck }] : []),
+    ...(isManager || isSupervisor ? [{ id: 'analytics', label: isSwahili ? 'Takwimu' : 'Analytics', icon: BarChart3 }] : []),
+    { id: 'customers', label: isSwahili ? 'Wateja' : 'Customers', icon: Users },
+    { id: 'messages', label: isSwahili ? 'Mawasiliano' : 'Chat', icon: MessageSquare },
+    { id: 'activity', label: isSwahili ? 'Kumbukumbu' : 'Logs', icon: History },
+    { id: 'account', label: isSwahili ? 'Akaunti' : 'Account', icon: User },
   ];
 
   return (
@@ -73,7 +75,9 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate 
             }`}
           >
             <LayoutDashboard className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] font-medium tracking-tight">Home</span>
+            <span className="text-[10px] font-medium tracking-tight">
+              {isSwahili ? 'Mwanzo' : 'Home'}
+            </span>
           </button>
 
           <button
@@ -85,7 +89,9 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate 
             <div className="relative">
               <ShoppingCart className="w-5 h-5 mb-0.5" />
             </div>
-            <span className="text-[10px] font-medium tracking-tight">Order</span>
+            <span className="text-[10px] font-medium tracking-tight">
+              {isSwahili ? 'Agizo' : 'Order'}
+            </span>
           </button>
 
           <button
@@ -95,7 +101,9 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate 
             }`}
           >
             <FileText className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] font-medium tracking-tight">EOD</span>
+            <span className="text-[10px] font-medium tracking-tight">
+              {isSwahili ? 'Ripoti' : 'EOD'}
+            </span>
           </button>
 
           {isSupervisor ? (
@@ -106,7 +114,9 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate 
               }`}
             >
               <ShieldCheck className="w-5 h-5 mb-0.5" />
-              <span className="text-[10px] font-medium tracking-tight">Supervise</span>
+              <span className="text-[10px] font-medium tracking-tight">
+                {isSwahili ? 'Msimamizi' : 'Supervise'}
+              </span>
             </button>
           ) : (
             <button
@@ -116,7 +126,9 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate 
               }`}
             >
               <Users className="w-5 h-5 mb-0.5" />
-              <span className="text-[10px] font-medium tracking-tight">Clients</span>
+              <span className="text-[10px] font-medium tracking-tight">
+                {isSwahili ? 'Wateja' : 'Clients'}
+              </span>
             </button>
           )}
 
@@ -127,7 +139,9 @@ export const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate 
             }`}
           >
             <MessageSquare className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] font-medium tracking-tight">Chat</span>
+            <span className="text-[10px] font-medium tracking-tight">
+              {isSwahili ? 'Mawasiliano' : 'Chat'}
+            </span>
           </button>
         </div>
       </div>

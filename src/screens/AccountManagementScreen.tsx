@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
+import { UKFlag, TanzaniaFlag } from '../components/FlagIcons';
 import { storageService } from '../services/storage';
 import {
   webAuthnService,
@@ -7,7 +9,7 @@ import {
   isMobileDevice,
   getMobileDeviceInfo,
 } from '../services/webauthn';
-import { BiometricCredential } from '../types';
+import { BiometricCredential, UserRole } from '../types';
 import {
   User,
   KeyRound,
@@ -27,6 +29,7 @@ import {
   Check,
   AlertTriangle,
   X,
+  Globe,
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
 
@@ -35,7 +38,8 @@ interface AccountManagementScreenProps {
 }
 
 export const AccountManagementScreen: React.FC<AccountManagementScreenProps> = ({ onNavigate }) => {
-  const { user, updateProfile, registerBiometrics, logout } = useAuth();
+  const { user, role, setRole, updateProfile, registerBiometrics, logout } = useAuth();
+  const { language, setLanguage, isSwahili } = useLanguage();
   const [name, setName] = useState<string>(user?.name || '');
   const [email, setEmail] = useState<string>(user?.email || '');
   const [phone, setPhone] = useState<string>(user?.phone || '');
@@ -243,13 +247,135 @@ export const AccountManagementScreen: React.FC<AccountManagementScreenProps> = (
               type="submit"
               className="bg-[#006B3C] hover:bg-[#008F50] text-white px-4 py-2 rounded-xl text-xs font-bold"
             >
-              Update Information
+              {isSwahili ? 'Sasisha Taarifa' : 'Update Information'}
             </button>
           </div>
         </form>
       </div>
 
-      {/* 2. WebAuthn Biometric & Passkey Security */}
+      {/* 2. Language & Regional Localization (EN / SW) */}
+      <div className="bg-[#122010] p-5 rounded-2xl border border-[#2A5038] space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#243447] pb-3">
+          <div>
+            <h2 className="text-xs font-semibold text-white uppercase tracking-wider flex items-center gap-2">
+              <Globe className="w-4 h-4 text-[#00C46A]" />
+              <span>{isSwahili ? 'Lugha na Eneo' : 'Language & Regional Localization'}</span>
+            </h2>
+            <p className="text-[11px] text-[#8899AA] mt-0.5">
+              {isSwahili
+                ? 'Chagua lugha inayotumiwa kwenye mfumo mzima (Kiingereza au Kiswahili).'
+                : 'Select the operational language used throughout navigation, forms, and dispatch reports.'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1A2E1C] border border-[#3A5068] text-xs font-mono text-[#00C46A]">
+            <span className="text-[10px] text-[#8899AA]">Variable:</span>
+            <span className="font-bold">isSwahili = {isSwahili ? 'true' : 'false'}</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* English Option */}
+          <button
+            type="button"
+            onClick={() => setLanguage('en')}
+            className={`p-3.5 rounded-xl border flex items-center justify-between text-left transition-all ${
+              language === 'en'
+                ? 'bg-[#006B3C]/20 border-[#00C46A] shadow-md ring-1 ring-[#00C46A]/50'
+                : 'bg-[#1A2E1C]/60 border-[#3A5068]/60 hover:bg-[#1A2E1C] hover:border-[#3A5068]'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <UKFlag className="w-7 h-5" />
+              <div>
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>English (EN)</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 font-mono">
+                    United Kingdom
+                  </span>
+                </div>
+                <div className="text-[11px] text-[#8899AA] mt-0.5">International English</div>
+              </div>
+            </div>
+            {language === 'en' && <CheckCircle2 className="w-4 h-4 text-[#00C46A]" />}
+          </button>
+
+          {/* Kiswahili Option */}
+          <button
+            type="button"
+            onClick={() => setLanguage('sw')}
+            className={`p-3.5 rounded-xl border flex items-center justify-between text-left transition-all ${
+              language === 'sw'
+                ? 'bg-[#006B3C]/20 border-[#00C46A] shadow-md ring-1 ring-[#00C46A]/50'
+                : 'bg-[#1A2E1C]/60 border-[#3A5068]/60 hover:bg-[#1A2E1C] hover:border-[#3A5068]'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <TanzaniaFlag className="w-7 h-5" />
+              <div>
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>Kiswahili (SW)</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#00C46A]/20 text-[#00C46A] font-mono">
+                    Tanzania
+                  </span>
+                </div>
+                <div className="text-[11px] text-[#8899AA] mt-0.5">Lugha ya Kiswahili Sanifu</div>
+              </div>
+            </div>
+            {language === 'sw' && <CheckCircle2 className="w-4 h-4 text-[#00C46A]" />}
+          </button>
+        </div>
+      </div>
+
+      {/* 3. Operational Role Switcher */}
+      <div className="bg-[#122010] p-5 rounded-2xl border border-[#2A5038] space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#243447] pb-3">
+          <div>
+            <h2 className="text-xs font-semibold text-white uppercase tracking-wider flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-[#00C46A]" />
+              <span>{isSwahili ? 'Wadhifa wa Uendeshaji' : 'Operational Role & Access Tier'}</span>
+            </h2>
+            <p className="text-[11px] text-[#8899AA] mt-0.5">
+              {isSwahili
+                ? 'Badilisha wadhifa wako wa kufanya kazi ili kupata idhini husika.'
+                : 'Switch your active operational privilege tier to test or execute role-specific duties.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {(['field_staff', 'supervisor', 'manager'] as UserRole[]).map((r) => {
+            const isActive = role === r;
+            const labels = {
+              field_staff: { title: isSwahili ? 'Mfanyakazi wa Nyanjani' : 'Field Staff', desc: isSwahili ? 'Mauzo na usambazaji' : 'Deliveries, POS & EOD' },
+              supervisor: { title: isSwahili ? 'Msimamizi wa Eneo' : 'Supervisor', desc: isSwahili ? 'Idhini ya maagizo na timu' : 'Approvals & Live Map' },
+              manager: { title: isSwahili ? 'Meneja wa Uendeshaji' : 'Manager', desc: isSwahili ? 'Takwimu kamili na stoo' : 'Full Analytics & Control' },
+            };
+            return (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRole(r)}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  isActive
+                    ? 'bg-[#006B3C]/20 border-[#00C46A] shadow-md ring-1 ring-[#00C46A]/50'
+                    : 'bg-[#1A2E1C]/60 border-[#3A5068]/60 hover:bg-[#1A2E1C]'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-bold ${isActive ? 'text-[#00C46A]' : 'text-white'}`}>
+                    {labels[r].title}
+                  </span>
+                  {isActive && <CheckCircle2 className="w-3.5 h-3.5 text-[#00C46A]" />}
+                </div>
+                <p className="text-[11px] text-[#8899AA] mt-1">{labels[r].desc}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 4. WebAuthn Biometric & Passkey Security */}
       <div className="bg-[#122010] p-5 rounded-2xl border border-[#2A5038] space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#243447] pb-3">
           <div>

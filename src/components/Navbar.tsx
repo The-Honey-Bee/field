@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { storageService } from '../services/storage';
-import { Wifi, WifiOff, Bell, RefreshCw, ChevronDown, CheckCircle2, User, ShieldAlert, Database, Cloud } from 'lucide-react';
+import { Wifi, WifiOff, Bell, RefreshCw, ChevronDown, CheckCircle2, User, ShieldAlert } from 'lucide-react';
 import { UserRole } from '../types';
 import { SupabaseStatusModal } from './SupabaseStatusModal';
 import { OfflineSyncModal } from './OfflineSyncModal';
 import { ThemeToggle } from './ThemeToggle';
+import { LanguageSelector } from './LanguageSelector';
 
 interface NavbarProps {
   currentView: string;
@@ -14,10 +16,10 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
   const { user, role, setRole, logout } = useAuth();
+  const { isSwahili } = useLanguage();
   const [isOnline, setIsOnline] = useState<boolean>(storageService.isOnline());
   const [pendingCount, setPendingCount] = useState<number>(storageService.getPendingSyncCount());
   const [isSyncing, setIsSyncing] = useState<boolean>(storageService.isSyncing());
-  const [showRoleMenu, setShowRoleMenu] = useState<boolean>(false);
   const [showNotifMenu, setShowNotifMenu] = useState<boolean>(false);
   const [showDbModal, setShowDbModal] = useState<boolean>(false);
   const [showSyncModal, setShowSyncModal] = useState<boolean>(false);
@@ -87,10 +89,12 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
             <div className="flex items-center gap-2">
               <span className="font-bold text-white tracking-wider text-base sm:text-lg">ZAMZAM</span>
               <span className="text-xs font-semibold text-[#00C46A] bg-[#006B3C]/40 px-2 py-0.5 rounded border border-[#00C46A]/30">
-                FIELD
+                {isSwahili ? 'UWANDANI' : 'FIELD'}
               </span>
             </div>
-            <div className="text-xs text-[#8899AA] hidden sm:block">Operations & Delivery Dispatch</div>
+            <div className="text-xs text-[#8899AA] hidden sm:block">
+              {isSwahili ? 'Uendeshaji na Usambazaji wa Maji' : 'Operations & Delivery Dispatch'}
+            </div>
           </div>
         </div>
 
@@ -105,18 +109,18 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
             {isOnline ? (
               <span className="flex items-center gap-1 text-[#00C46A]">
                 <Wifi className="w-3.5 h-3.5" />
-                <span className="hidden md:inline font-medium">Online</span>
+                <span className="hidden md:inline font-medium">{isSwahili ? 'Mtandaoni' : 'Online'}</span>
               </span>
             ) : (
               <span className="flex items-center gap-1 text-[#F59E0B]">
                 <WifiOff className="w-3.5 h-3.5" />
-                <span className="hidden md:inline font-medium">Offline</span>
+                <span className="hidden md:inline font-medium">{isSwahili ? 'Nje ya Mtandao' : 'Offline'}</span>
               </span>
             )}
 
             {pendingCount > 0 && (
               <span className="bg-[#F59E0B]/20 text-[#F59E0B] font-semibold px-1.5 py-0.5 rounded text-[10px]">
-                {pendingCount} pending
+                {pendingCount} {isSwahili ? 'zinazosubiri' : 'pending'}
               </span>
             )}
 
@@ -130,16 +134,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
             </button>
           </div>
 
-          {/* Database / Supabase Cloud Diagnostic Button */}
-          <button
-            onClick={() => setShowDbModal(true)}
-            title="Database & Supabase Connection Status"
-            className="flex items-center gap-1 bg-[#122010] hover:bg-[#1A2E1C] border border-[#3A5068] text-[#8899AA] hover:text-[#00C46A] px-2.5 py-1.5 rounded-full text-xs transition-colors"
-          >
-            <Database className="w-3.5 h-3.5 text-[#00C46A]" />
-            <span className="hidden sm:inline font-medium">Cloud DB</span>
-          </button>
-
           {/* High-Contrast Outdoor Sunlight / Dark Mode Toggle */}
           <ThemeToggle variant="navbar" />
 
@@ -150,48 +144,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
             </div>
           )}
 
-          {/* Role Switcher Pill */}
-          <div className="relative">
-            <button
-              onClick={() => setShowRoleMenu(!showRoleMenu)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all ${roleInfo.bg}`}
-            >
-              <span>{roleInfo.label}</span>
-              <ChevronDown className="w-3 h-3 opacity-70" />
-            </button>
-
-            {showRoleMenu && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowRoleMenu(false)} />
-                <div className="absolute right-0 mt-2 w-48 bg-[#122010] border border-[#3A5068] rounded-xl shadow-xl z-50 py-1.5 text-xs animate-in fade-in zoom-in-95">
-                  <div className="px-3 py-1.5 text-[10px] text-[#8899AA] font-bold uppercase tracking-wider">
-                    Switch Active Role
-                  </div>
-                  <button
-                    onClick={() => { setRole('field_staff'); setShowRoleMenu(false); }}
-                    className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-[#1A2E1C] ${role === 'field_staff' ? 'text-[#00C46A] font-bold' : 'text-[#D0E8F0]'}`}
-                  >
-                    <span>Field Staff</span>
-                    {role === 'field_staff' && <CheckCircle2 className="w-3.5 h-3.5 text-[#00C46A]" />}
-                  </button>
-                  <button
-                    onClick={() => { setRole('supervisor'); setShowRoleMenu(false); }}
-                    className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-[#1A2E1C] ${role === 'supervisor' ? 'text-blue-400 font-bold' : 'text-[#D0E8F0]'}`}
-                  >
-                    <span>Supervisor</span>
-                    {role === 'supervisor' && <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />}
-                  </button>
-                  <button
-                    onClick={() => { setRole('manager'); setShowRoleMenu(false); }}
-                    className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-[#1A2E1C] ${role === 'manager' ? 'text-purple-400 font-bold' : 'text-[#D0E8F0]'}`}
-                  >
-                    <span>Manager</span>
-                    {role === 'manager' && <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          {/* Language Selection Button (EN with UK Flag, SW with Tanzania Flag) */}
+          <LanguageSelector />
 
           {/* Notifications Icon with dropdown */}
           <div className="relative">
@@ -228,15 +182,18 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
             )}
           </div>
 
-          {/* User Profile Avatar */}
+          {/* User Profile Avatar & Role */}
           <button
             onClick={() => onNavigate('account')}
-            className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-[#122010] border border-transparent hover:border-[#3A5068] transition-colors"
-            title="Account Management"
+            className="flex items-center gap-2 p-1 rounded-lg hover:bg-[#122010] border border-transparent hover:border-[#3A5068] transition-colors"
+            title={`Account Management - ${roleInfo.label}`}
           >
             <div className="w-8 h-8 rounded-full bg-[#006B3C] border border-[#00C46A]/50 flex items-center justify-center font-bold text-white text-xs">
               {user?.name.slice(0, 2).toUpperCase() || 'ZZ'}
             </div>
+            <span className={`hidden xl:inline text-[10px] font-semibold px-2 py-0.5 rounded border ${roleInfo.bg}`}>
+              {roleInfo.label}
+            </span>
           </button>
         </div>
       </div>

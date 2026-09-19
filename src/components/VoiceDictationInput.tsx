@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import {
   Mic,
   MicOff,
@@ -27,27 +28,54 @@ const SUPPORTED_LANGUAGES = [
   { code: 'ar-SA', label: 'العربية (Arabic)' },
 ];
 
-const FIELD_OBSERVATION_SHORTCUTS = [
+const FIELD_OBSERVATION_SHORTCUTS_EN = [
   'All 65 empty 20L bottles verified and returned to depot rack.',
   'Van odometer checked. Fuel voucher 20L diesel filed.',
   'All cash and mobile collections balanced with shift orders.',
   'Depot security handover completed without any damaged bottles.',
 ];
 
+const FIELD_OBSERVATION_SHORTCUTS_SW = [
+  'Chupa zote 65 tupu (20L) zimethibitishwa na kurudishwa stoo.',
+  'Usomaji wa gari umekaguliwa na vocha ya mafuta imekabidhiwa.',
+  'Pesa zote taslimu na malipo ya simu zimelingana na maagizo ya zamu.',
+  'Makabidhiano ya ulinzi wa stoo yamekamilika bila hitilafu ya chupa.',
+];
+
 export const VoiceDictationInput: React.FC<VoiceDictationInputProps> = ({
   value,
   onChange,
-  placeholder = 'Dictate or type end-of-day field observations...',
-  label = 'End-of-Day Site Observations & Handover Remarks',
+  placeholder,
+  label,
   id = 'voice-notes-input',
 }) => {
+  const { isSwahili } = useLanguage();
   const [isListening, setIsListening] = useState<boolean>(false);
   const [interimTranscript, setInterimTranscript] = useState<string>('');
-  const [selectedLang, setSelectedLang] = useState<string>('en-US');
+  const [selectedLang, setSelectedLang] = useState<string>(isSwahili ? 'sw-TZ' : 'en-US');
   const [isSupported, setIsSupported] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [soundLevel, setSoundLevel] = useState<number>(1);
   const [showQuickPhrases, setShowQuickPhrases] = useState<boolean>(false);
+
+  // Sync selected voice dictation language when user toggles Swahili in app
+  useEffect(() => {
+    setSelectedLang(isSwahili ? 'sw-TZ' : 'en-US');
+  }, [isSwahili]);
+
+  const effectivePlaceholder =
+    placeholder ||
+    (isSwahili
+      ? 'Sema au andika maelezo ya ukaguzi wa kazi wa mwisho wa siku...'
+      : 'Dictate or type end-of-day field observations...');
+
+  const effectiveLabel =
+    label ||
+    (isSwahili
+      ? 'Maelezo ya Ukaguzi wa Mwisho wa Siku na Makabidhiano'
+      : 'End-of-Day Site Observations & Handover Remarks');
+
+  const shortcuts = isSwahili ? FIELD_OBSERVATION_SHORTCUTS_SW : FIELD_OBSERVATION_SHORTCUTS_EN;
 
   const recognitionRef = useRef<any>(null);
   const soundIntervalRef = useRef<any>(null);
@@ -221,8 +249,10 @@ export const VoiceDictationInput: React.FC<VoiceDictationInputProps> = ({
           className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5"
         >
           <Volume2 className="w-3.5 h-3.5 text-[#00C46A]" />
-          <span>{label}</span>
-          <span className="text-[10px] lowercase font-normal text-[#8899AA]">(voice-to-text enabled)</span>
+          <span>{effectiveLabel}</span>
+          <span className="text-[10px] lowercase font-normal text-[#8899AA]">
+            ({isSwahili ? 'sauti-hadi-maandishi imewashwa' : 'voice-to-text enabled'})
+          </span>
         </label>
 
         {/* Controls: Language and Mic */}
@@ -355,7 +385,7 @@ export const VoiceDictationInput: React.FC<VoiceDictationInputProps> = ({
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            {FIELD_OBSERVATION_SHORTCUTS.map((phrase, idx) => (
+            {shortcuts.map((phrase, idx) => (
               <button
                 key={idx}
                 type="button"
@@ -402,7 +432,7 @@ export const VoiceDictationInput: React.FC<VoiceDictationInputProps> = ({
           rows={3}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
+          placeholder={effectivePlaceholder}
           className={`w-full bg-[#1A2E1C] border ${
             isListening ? 'border-[#00C46A] ring-1 ring-[#00C46A]/50' : 'border-[#3A5068]'
           } rounded-xl p-3 text-xs text-white placeholder-[#8899AA] focus:outline-none focus:border-[#00C46A] transition-all`}
@@ -410,7 +440,7 @@ export const VoiceDictationInput: React.FC<VoiceDictationInputProps> = ({
         {isListening && (
           <div className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-[#00C46A]/20 border border-[#00C46A]/40 text-[#00C46A] px-2 py-0.5 rounded-full text-[10px] font-bold">
             <span className="w-1.5 h-1.5 rounded-full bg-[#00C46A] animate-ping" />
-            <span>Dictating Live</span>
+            <span>{isSwahili ? 'Inasikiliza...' : 'Dictating Live'}</span>
           </div>
         )}
       </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
 import { Order, EodReport, ProofImage } from '../types';
@@ -24,6 +25,7 @@ interface SupervisorScreenProps {
 }
 
 export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }) => {
+  const { t, isSwahili } = useLanguage();
   const [activeTab, setActiveTab] = useState<'orders' | 'reports' | 'team'>('orders');
   const [orders, setOrders] = useState<Order[]>([]);
   const [reports, setReports] = useState<EodReport[]>([]);
