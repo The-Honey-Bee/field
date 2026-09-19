@@ -13,7 +13,6 @@ import {
   User,
   Phone,
   ArrowRight,
-  ShieldCheck,
   AlertCircle,
   RefreshCw,
   Fingerprint,
@@ -217,23 +216,6 @@ export const AuthScreen: React.FC = () => {
                 )}
               </button>
 
-              <div className="flex items-center justify-between text-[11px] text-[#8899AA] px-1">
-                <span className="flex items-center gap-1.5">
-                  <Smartphone className="w-3.5 h-3.5 text-[#00C46A]" />
-                  <span>{isMobile ? `${deviceInfo.deviceModel} Sensor` : 'WebAuthn Passkey API'}</span>
-                </span>
-                {emailHasBiometrics ? (
-                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Enrolled on this phone
-                  </span>
-                ) : (
-                  <span className="text-[#8899AA] flex items-center gap-1">
-                    <Fingerprint className="w-3 h-3 text-[#00C46A]" />
-                    <span>{deviceInfo.biometricType}</span>
-                  </span>
-                )}
-              </div>
-
               {isMobile && !hasRegisteredBiometrics && (
                 <div className="bg-[#1A2E1C]/90 border border-[#2A5038] p-2.5 rounded-xl text-[11px] text-[#D0E8F0] flex items-start gap-2">
                   <Smartphone className="w-4 h-4 text-[#00C46A] shrink-0 mt-0.5" />
@@ -348,13 +330,6 @@ export const AuthScreen: React.FC = () => {
               )}
             </button>
           </form>
-
-          <div className="pt-2 text-center">
-            <span className="text-[11px] text-[#8899AA] flex items-center justify-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#00C46A]" />
-              <span>Hardware Passkey & FIDO2 WebAuthn Protected</span>
-            </span>
-          </div>
         </div>
       </div>
     </div>
