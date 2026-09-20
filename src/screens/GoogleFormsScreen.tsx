@@ -44,6 +44,7 @@ import {
 } from '../services/googleForms';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { ConfirmationModal } from '../components/ConfirmationModal';
+import { useLanguage } from '../context/LanguageContext';
 import { User } from 'firebase/auth';
 
 interface GoogleFormsScreenProps {
@@ -51,6 +52,7 @@ interface GoogleFormsScreenProps {
 }
 
 export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate }) => {
+  const { isSwahili } = useLanguage();
   // Authentication State
   const [googleUser, setGoogleUser] = useState<User | null>(getGoogleUser());
   const [hasToken, setHasToken] = useState<boolean>(!!getWorkspaceAccessToken());
@@ -378,13 +380,17 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
             </div>
             <div>
               <div className="flex items-center gap-2.5">
-                <h1 className="text-xl font-bold text-white tracking-tight">Google Forms Integration</h1>
+                <h1 className="text-xl font-bold text-white tracking-tight">
+                  {isSwahili ? 'Ushirikiano wa Google Forms' : 'Google Forms Integration'}
+                </h1>
                 <span className="px-2.5 py-0.5 text-[11px] font-semibold tracking-wide rounded-full bg-[#00C46A]/20 text-[#00C46A] border border-[#00C46A]/40">
                   Google Workspace
                 </span>
               </div>
               <p className="text-xs text-[#8899AA] mt-0.5">
-                Deploy customer feedback surveys, field dispenser checklists, and inspect live responses via Google Forms & Drive APIs.
+                {isSwahili
+                  ? 'Sambaza tafiti za maoni ya wateja, orodha za ukaguzi wa mashine za maji, na kagua majibu ya moja kwa moja kupitia Google Forms & Drive APIs.'
+                  : 'Deploy customer feedback surveys, field dispenser checklists, and inspect live responses via Google Forms & Drive APIs.'}
               </p>
             </div>
           </div>
@@ -407,20 +413,20 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                 )}
                 <div className="flex flex-col text-left">
                   <span className="text-xs font-medium text-white line-clamp-1">
-                    {googleUser.displayName || 'Google Account'}
+                    {googleUser.displayName || (isSwahili ? 'Akaunti ya Google' : 'Google Account')}
                   </span>
                   <span className="text-[10px] text-[#00C46A] flex items-center gap-1 font-mono">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#00C46A] animate-pulse" />
-                    Connected to Workspace
+                    {isSwahili ? 'Imeunganishwa na Workspace' : 'Connected to Workspace'}
                   </span>
                 </div>
                 <button
                   id="btn-google-signout"
                   onClick={handleSignOut}
-                  title="Disconnect Google Account"
+                  title={isSwahili ? 'Tenganisha Akaunti ya Google' : 'Disconnect Google Account'}
                   className="ml-2 text-xs text-[#8899AA] hover:text-red-400 p-1.5 rounded-md hover:bg-[#1A2E1C] transition-colors"
                 >
-                  Disconnect
+                  {isSwahili ? 'Tenganisha' : 'Disconnect'}
                 </button>
               </div>
             ) : (
@@ -429,7 +435,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                   id="btn-google-signin"
                   onClick={handleSignIn}
                   disabled={isAuthenticating}
-                  text={isAuthenticating ? 'Connecting...' : 'Sign in with Google'}
+                  text={isAuthenticating ? (isSwahili ? 'Inaunganisha...' : 'Connecting...') : (isSwahili ? 'Ingia na Google' : 'Sign in with Google')}
                 />
               </div>
             )}
@@ -451,9 +457,13 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
             <FileText className="w-7 h-7" />
           </div>
           <div className="max-w-md mx-auto space-y-2">
-            <h2 className="text-base font-bold text-white">Connect Google Forms to Zamzam Field</h2>
+            <h2 className="text-base font-bold text-white">
+              {isSwahili ? 'Unganisha Google Forms na Zamzam Field' : 'Connect Google Forms to Zamzam Field'}
+            </h2>
             <p className="text-xs text-[#8899AA] leading-relaxed">
-              Sign in with your Google Workspace account to create customer water taste surveys, inspect field equipment maintenance forms, and synchronize responses directly inside the dashboard.
+              {isSwahili
+                ? 'Ingia na akaunti yako ya Google Workspace kuunda tafiti za kuridhika kwa wateja, kukagua fomu za matengenezo, na kusawazisha majibu moja kwa moja kwenye dashibodi.'
+                : 'Sign in with your Google Workspace account to create customer water taste surveys, inspect field equipment maintenance forms, and synchronize responses directly inside the dashboard.'}
             </p>
           </div>
 
@@ -462,7 +472,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
               id="btn-google-signin-hero"
               onClick={handleSignIn}
               disabled={isAuthenticating}
-              text="Authorize Google Forms & Drive"
+              text={isSwahili ? 'Idhinisha Google Forms & Drive' : 'Authorize Google Forms & Drive'}
             />
           </div>
 
@@ -470,28 +480,34 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
             <div className="p-3 bg-[#0A1A0F] border border-[#243447] rounded-lg space-y-1">
               <span className="text-xs font-semibold text-[#00C46A] flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                Forms Creation
+                {isSwahili ? 'Uundaji wa Fomu' : 'Forms Creation'}
               </span>
               <p className="text-[11px] text-[#8899AA]">
-                Instant 1-click generation of ISO-grade water satisfaction and equipment checklists.
+                {isSwahili
+                  ? 'Uundaji wa haraka wa fomu za maoni ya ubora wa maji na ukaguzi wa vifaa.'
+                  : 'Instant 1-click generation of ISO-grade water satisfaction and equipment checklists.'}
               </p>
             </div>
             <div className="p-3 bg-[#0A1A0F] border border-[#243447] rounded-lg space-y-1">
               <span className="text-xs font-semibold text-[#00C46A] flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                Live Submissions
+                {isSwahili ? 'Majibu ya Papo Hapo' : 'Live Submissions'}
               </span>
               <p className="text-[11px] text-[#8899AA]">
-                Monitor customer ratings, sanitization requests, and incident logs with zero delay.
+                {isSwahili
+                  ? 'Fuatilia ukadiriaji wa wateja, maombi ya kusafisha, na matukio bila kuchelewa.'
+                  : 'Monitor customer ratings, sanitization requests, and incident logs with zero delay.'}
               </p>
             </div>
             <div className="p-3 bg-[#0A1A0F] border border-[#243447] rounded-lg space-y-1">
               <span className="text-xs font-semibold text-[#00C46A] flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                Drive Sync & Export
+                {isSwahili ? 'Usawazishaji na Upakuaji' : 'Drive Sync & Export'}
               </span>
               <p className="text-[11px] text-[#8899AA]">
-                Search all Drive forms and download response spreadsheets as CSV reports.
+                {isSwahili
+                  ? 'Tafuta fomu zote za Drive na pakua lahajedwali za majibu kama ripoti za CSV.'
+                  : 'Search all Drive forms and download response spreadsheets as CSV reports.'}
               </p>
             </div>
           </div>
@@ -507,14 +523,14 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
             <div className="bg-[#122010] border border-[#243447] rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-[#8899AA]">
-                  Google Drive Forms ({driveForms.length})
+                  {isSwahili ? `Fomu za Google Drive (${driveForms.length})` : `Google Drive Forms (${driveForms.length})`}
                 </h3>
                 <div className="flex items-center gap-1.5">
                   <button
                     id="btn-refresh-drive-forms"
                     onClick={loadDriveForms}
                     disabled={isLoadingForms}
-                    title="Refresh Forms from Drive"
+                    title={isSwahili ? 'Sasisha Fomu kutoka Drive' : 'Refresh Forms from Drive'}
                     className="p-1.5 text-[#8899AA] hover:text-white hover:bg-[#1A2E1C] rounded-lg transition-colors"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isLoadingForms ? 'animate-spin text-[#00C46A]' : ''}`} />
@@ -525,7 +541,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                     className="px-2.5 py-1 text-xs font-medium rounded-lg bg-[#006B3C] hover:bg-[#008F50] text-white flex items-center gap-1.5 transition-all shadow-xs"
                   >
                     <PlusCircle className="w-3.5 h-3.5" />
-                    <span>New Form</span>
+                    <span>{isSwahili ? 'Fomu Mpya' : 'New Form'}</span>
                   </button>
                 </div>
               </div>
@@ -536,7 +552,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                 <input
                   id="input-search-forms"
                   type="text"
-                  placeholder="Filter forms..."
+                  placeholder={isSwahili ? 'Chuja fomu...' : 'Filter forms...'}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full bg-[#0A1A0F] border border-[#243447] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#8899AA] focus:outline-hidden focus:border-[#00C46A]"
@@ -548,7 +564,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                 <input
                   id="input-manual-form-id"
                   type="text"
-                  placeholder="Paste Form ID or URL..."
+                  placeholder={isSwahili ? 'Weka Kitambulisho au Kiungo...' : 'Paste Form ID or URL...'}
                   value={manualFormInput}
                   onChange={(e) => setManualFormInput(e.target.value)}
                   className="flex-1 bg-[#0A1A0F] border border-[#243447] rounded-lg px-2.5 py-1 text-xs text-white placeholder-[#8899AA] focus:outline-hidden focus:border-[#00C46A]"
@@ -558,7 +574,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                   disabled={!manualFormInput.trim()}
                   className="px-2.5 py-1 bg-[#1A2E1C] hover:bg-[#243447] disabled:opacity-40 text-xs text-white rounded-lg transition-colors"
                 >
-                  Load
+                  {isSwahili ? 'Fungua' : 'Load'}
                 </button>
               </form>
             </div>
@@ -566,29 +582,31 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
             {/* Forms List Container */}
             <div className="bg-[#122010] border border-[#243447] rounded-xl overflow-hidden shadow-sm">
               <div className="p-3 border-b border-[#243447] flex items-center justify-between">
-                <span className="text-xs font-medium text-white">Forms in Drive</span>
-                <span className="text-[10px] text-[#8899AA]">Auto-synced</span>
+                <span className="text-xs font-medium text-white">{isSwahili ? 'Fomu Kwenye Drive' : 'Forms in Drive'}</span>
+                <span className="text-[10px] text-[#8899AA]">{isSwahili ? 'Inasawazishwa kiotomatiki' : 'Auto-synced'}</span>
               </div>
 
               {isLoadingForms && driveForms.length === 0 ? (
                 <div className="p-8 text-center space-y-2">
                   <div className="w-6 h-6 border-2 border-[#00C46A] border-t-transparent rounded-full animate-spin mx-auto" />
-                  <span className="text-xs text-[#8899AA]">Searching Google Drive files...</span>
+                  <span className="text-xs text-[#8899AA]">{isSwahili ? 'Inatafuta mafaili kwenye Google Drive...' : 'Searching Google Drive files...'}</span>
                 </div>
               ) : formsError ? (
                 <div className="p-4 text-xs text-red-300 space-y-1">
-                  <p className="font-semibold text-red-400">Failed to load forms:</p>
+                  <p className="font-semibold text-red-400">{isSwahili ? 'Hitilafu ya kupakia fomu:' : 'Failed to load forms:'}</p>
                   <p className="text-[11px] text-red-200">{formsError}</p>
                 </div>
               ) : filteredForms.length === 0 ? (
                 <div className="p-6 text-center space-y-3">
                   <FileText className="w-8 h-8 text-[#8899AA]/50 mx-auto" />
-                  <p className="text-xs text-[#8899AA]">No Google Forms found in this Drive folder.</p>
+                  <p className="text-xs text-[#8899AA]">
+                    {isSwahili ? 'Hakuna Fomu za Google zilizopatikana kwenye folda hii ya Drive.' : 'No Google Forms found in this Drive folder.'}
+                  </p>
                   <button
                     onClick={() => setActiveTab('create')}
                     className="px-3 py-1.5 bg-[#006B3C] text-white text-xs font-medium rounded-lg hover:bg-[#008F50] transition-colors"
                   >
-                    Deploy First Form
+                    {isSwahili ? 'Tengeneza Fomu ya Kwanza' : 'Deploy First Form'}
                   </button>
                 </div>
               ) : (
@@ -637,7 +655,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                               href={file.webViewLink}
                               target="_blank"
                               rel="noreferrer"
-                              title="Open in Google Forms Editor"
+                              title={isSwahili ? 'Fungua katika Mhariri wa Google Forms' : 'Open in Google Forms Editor'}
                               onClick={(e) => e.stopPropagation()}
                               className="p-1 rounded-md text-[#8899AA] hover:text-[#00C46A] hover:bg-[#0A1A0F] transition-colors"
                             >
@@ -645,7 +663,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                             </a>
                           )}
                           <button
-                            title="Delete Form from Drive"
+                            title={isSwahili ? 'Futa Fomu kutoka Drive' : 'Delete Form from Drive'}
                             onClick={(e) => {
                               e.stopPropagation();
                               requestDeleteForm(file);
@@ -666,10 +684,12 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
             <div className="bg-[#122010]/80 border border-[#243447] rounded-xl p-4 space-y-2 text-xs">
               <div className="flex items-center gap-2 text-[#00C46A] font-semibold">
                 <Sparkles className="w-4 h-4" />
-                <span>Field Dispatcher Tip</span>
+                <span>{isSwahili ? 'Kidokezo cha Msafirishaji' : 'Field Dispatcher Tip'}</span>
               </div>
               <p className="text-[11px] text-[#8899AA] leading-relaxed">
-                Courier drivers can share the live survey link with customers right at delivery checkout. Responses synchronize immediately into this analytics panel.
+                {isSwahili
+                  ? 'Madereva wanaweza kusambaza kiungo cha utafiti kwa wateja wakati wa kukabidhi maji. Majibu yanasawazishwa mara moja kwenye dashibodi hii.'
+                  : 'Courier drivers can share the live survey link with customers right at delivery checkout. Responses synchronize immediately into this analytics panel.'}
               </p>
             </div>
           </div>
@@ -689,7 +709,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                   }`}
                 >
                   <Eye className="w-3.5 h-3.5" />
-                  <span>Overview & KPI</span>
+                  <span>{isSwahili ? 'Muhtasari na KPI' : 'Overview & KPI'}</span>
                 </button>
                 <button
                   id="tab-form-questions"
@@ -701,7 +721,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                   }`}
                 >
                   <List className="w-3.5 h-3.5" />
-                  <span>Questions ({activeFormSchema?.items?.length || 0})</span>
+                  <span>{isSwahili ? `Maswali (${activeFormSchema?.items?.length || 0})` : `Questions (${activeFormSchema?.items?.length || 0})`}</span>
                 </button>
                 <button
                   id="tab-form-responses"
@@ -713,7 +733,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                   }`}
                 >
                   <BarChart2 className="w-3.5 h-3.5" />
-                  <span>Responses ({activeFormResponses?.responses?.length || 0})</span>
+                  <span>{isSwahili ? `Majibu (${activeFormResponses?.responses?.length || 0})` : `Responses (${activeFormResponses?.responses?.length || 0})`}</span>
                 </button>
                 <button
                   id="tab-form-create"
@@ -725,7 +745,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                   }`}
                 >
                   <PlusCircle className="w-3.5 h-3.5" />
-                  <span>Create New Form</span>
+                  <span>{isSwahili ? 'Unda Fomu Mpya' : 'Create New Form'}</span>
                 </button>
               </div>
 
@@ -749,9 +769,13 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                 <div className="bg-[#122010] border border-[#243447] rounded-xl p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-base font-bold text-white">Deploy Zamzam Operations Form</h2>
+                      <h2 className="text-base font-bold text-white">
+                        {isSwahili ? 'Sambaza Fomu ya Uendeshaji ya Zamzam' : 'Deploy Zamzam Operations Form'}
+                      </h2>
                       <p className="text-xs text-[#8899AA]">
-                        Select a pre-engineered operations protocol to automatically initialize a Google Form in your Drive with question schemas.
+                        {isSwahili
+                          ? 'Chagua mfumo uliotayarishwa ili kuanzisha kiotomatiki Fomu ya Google kwenye Hifadhi yako ya Drive na muundo wa maswali.'
+                          : 'Select a pre-engineered operations protocol to automatically initialize a Google Form in your Drive with question schemas.'}
                       </p>
                     </div>
                   </div>
@@ -776,7 +800,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                             className="px-3.5 py-1.5 bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-xs self-start sm:self-auto"
                           >
                             <PlusCircle className="w-3.5 h-3.5" />
-                            <span>Deploy to Drive</span>
+                            <span>{isSwahili ? 'Weka kwenye Drive' : 'Deploy to Drive'}</span>
                           </button>
                         </div>
 
@@ -785,7 +809,9 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                         {/* Question Previews */}
                         <div className="pt-2 border-t border-[#243447]/60 space-y-1.5">
                           <span className="text-[11px] font-semibold text-[#D0E8F0]">
-                            Form Structure ({tmpl.questions.length} Items):
+                            {isSwahili
+                              ? `Muundo wa Fomu (Vipengele ${tmpl.questions.length}):`
+                              : `Form Structure (${tmpl.questions.length} Items):`}
                           </span>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-[#8899AA]">
                             {tmpl.questions.slice(0, 4).map((q, idx) => (
@@ -797,7 +823,9 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                             ))}
                             {tmpl.questions.length > 4 && (
                               <div className="text-[10px] text-[#00C46A] italic">
-                                + {tmpl.questions.length - 4} additional field questions
+                                {isSwahili
+                                  ? `+ maswali ${tmpl.questions.length - 4} ya ziada`
+                                  : `+ ${tmpl.questions.length - 4} additional field questions`}
                               </div>
                             )}
                           </div>
@@ -815,27 +843,29 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                 {isLoadingDetails ? (
                   <div className="bg-[#122010] border border-[#243447] rounded-xl p-12 text-center space-y-3">
                     <div className="w-8 h-8 border-3 border-[#00C46A] border-t-transparent rounded-full animate-spin mx-auto" />
-                    <span className="text-xs text-[#8899AA]">Loading Google Form specifications...</span>
+                    <span className="text-xs text-[#8899AA]">{isSwahili ? 'Inapakia maelezo ya Google Form...' : 'Loading Google Form specifications...'}</span>
                   </div>
                 ) : detailsError ? (
                   <div className="bg-[#122010] border border-red-900/60 rounded-xl p-6 text-center space-y-3">
                     <AlertCircle className="w-8 h-8 text-red-400 mx-auto" />
-                    <h3 className="text-sm font-semibold text-white">Error Loading Form</h3>
+                    <h3 className="text-sm font-semibold text-white">{isSwahili ? 'Hitilafu ya Kupakia Fomu' : 'Error Loading Form'}</h3>
                     <p className="text-xs text-red-200">{detailsError}</p>
                     <button
                       onClick={() => selectedFormId && handleSelectForm(selectedFormId)}
                       className="px-3 py-1.5 bg-[#1A2E1C] text-xs font-medium text-white rounded-lg hover:bg-[#243447]"
                     >
-                      Retry Connection
+                      {isSwahili ? 'Jaribu Tena' : 'Retry Connection'}
                     </button>
                   </div>
                 ) : !activeFormSchema ? (
                   <div className="bg-[#122010] border border-[#243447] rounded-xl p-12 text-center space-y-4">
                     <FileText className="w-12 h-12 text-[#8899AA]/40 mx-auto" />
                     <div className="max-w-sm mx-auto space-y-1">
-                      <h3 className="text-sm font-semibold text-white">No Form Selected</h3>
+                      <h3 className="text-sm font-semibold text-white">{isSwahili ? 'Hakuna Fomu Iliyochaguliwa' : 'No Form Selected'}</h3>
                       <p className="text-xs text-[#8899AA]">
-                        Select a form from the left panel or deploy a new operations template to view its live metrics.
+                        {isSwahili
+                          ? 'Chagua fomu kwenye orodha ya kushoto au tengeneza mpya kuona takwimu zake za moja kwa moja.'
+                          : 'Select a form from the left panel or deploy a new operations template to view its live metrics.'}
                       </p>
                     </div>
                   </div>
@@ -847,7 +877,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                         <div>
                           <div className="flex items-center gap-2">
                             <h2 className="text-lg font-bold text-white">
-                              {activeFormSchema.info.title || 'Untitled Form'}
+                              {activeFormSchema.info.title || (isSwahili ? 'Fomu Isiyo na Kichwa' : 'Untitled Form')}
                             </h2>
                             <span className="text-[10px] font-mono px-2 py-0.5 rounded-sm bg-[#1A2E1C] text-[#8899AA] border border-[#243447]">
                               ID: {activeFormSchema.formId.slice(0, 12)}...
@@ -870,7 +900,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                             className="px-3 py-1.5 bg-[#1A2E1C] hover:bg-[#243447] border border-[#3A5068] text-white text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors"
                           >
                             <ExternalLink className="w-3.5 h-3.5 text-[#00C46A]" />
-                            <span>Edit in Google Forms</span>
+                            <span>{isSwahili ? 'Hariri katika Google Forms' : 'Edit in Google Forms'}</span>
                           </a>
 
                           {activeFormSchema.responderUri && (
@@ -882,7 +912,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                               className="px-3 py-1.5 bg-[#006B3C] hover:bg-[#008F50] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
                             >
                               <Send className="w-3.5 h-3.5" />
-                              <span>Live Form Link</span>
+                              <span>{isSwahili ? 'Kiungo cha Fomu' : 'Live Form Link'}</span>
                             </a>
                           )}
                         </div>
@@ -898,7 +928,10 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                           <button
                             id="btn-copy-form-url"
                             onClick={() =>
-                              handleCopyLink(activeFormSchema.responderUri!, 'Public Form Link Copied!')
+                              handleCopyLink(
+                                activeFormSchema.responderUri!,
+                                isSwahili ? 'Kiungo Kimenakiliwa!' : 'Public Form Link Copied!'
+                              )
                             }
                             className="px-2.5 py-1 text-xs bg-[#1A2E1C] hover:bg-[#243447] text-white rounded-md flex items-center gap-1 shrink-0 transition-colors"
                           >
@@ -910,7 +943,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                             ) : (
                               <>
                                 <Copy className="w-3 h-3" />
-                                <span>Copy Link</span>
+                                <span>{isSwahili ? 'Nakili Kiungo' : 'Copy Link'}</span>
                               </>
                             )}
                           </button>
@@ -922,31 +955,31 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="bg-[#122010] border border-[#243447] rounded-xl p-4 space-y-1">
                         <span className="text-[11px] text-[#8899AA] uppercase tracking-wider font-semibold">
-                          Total Submissions
+                          {isSwahili ? 'Jumla ya Majibu' : 'Total Submissions'}
                         </span>
                         <div className="flex items-baseline gap-2">
                           <span className="text-2xl font-black text-white">
                             {activeFormResponses?.responses?.length || 0}
                           </span>
-                          <span className="text-[11px] text-[#00C46A]">Sync Verified</span>
+                          <span className="text-[11px] text-[#00C46A]">{isSwahili ? 'Imethibitishwa' : 'Sync Verified'}</span>
                         </div>
                       </div>
 
                       <div className="bg-[#122010] border border-[#243447] rounded-xl p-4 space-y-1">
                         <span className="text-[11px] text-[#8899AA] uppercase tracking-wider font-semibold">
-                          Form Question Items
+                          {isSwahili ? 'Vipengele vya Maswali' : 'Form Question Items'}
                         </span>
                         <div className="flex items-baseline gap-2">
                           <span className="text-2xl font-black text-white">
                             {activeFormSchema.items?.length || 0}
                           </span>
-                          <span className="text-[11px] text-[#8899AA]">Active fields</span>
+                          <span className="text-[11px] text-[#8899AA]">{isSwahili ? 'Sehemu zinazotumika' : 'Active fields'}</span>
                         </div>
                       </div>
 
                       <div className="bg-[#122010] border border-[#243447] rounded-xl p-4 space-y-1">
                         <span className="text-[11px] text-[#8899AA] uppercase tracking-wider font-semibold">
-                          Last Response
+                          {isSwahili ? 'Jibu la Mwisho' : 'Last Response'}
                         </span>
                         <div className="text-sm font-semibold text-white truncate pt-1">
                           {activeFormResponses?.responses?.[0]
@@ -954,7 +987,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                                 activeFormResponses.responses[0].lastSubmittedTime ||
                                   activeFormResponses.responses[0].createTime
                               ).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
-                            : 'No submissions yet'}
+                            : (isSwahili ? 'Bado hakuna majibu' : 'No submissions yet')}
                         </div>
                       </div>
                     </div>
@@ -963,9 +996,11 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                     <div className="bg-[#122010] border border-[#243447] rounded-xl p-5 space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="text-sm font-bold text-white">Live Feedback Breakdown</h3>
+                          <h3 className="text-sm font-bold text-white">{isSwahili ? 'Uchambuzi wa Maoni' : 'Live Feedback Breakdown'}</h3>
                           <p className="text-xs text-[#8899AA]">
-                            Aggregated ratings and options collected from respondents.
+                            {isSwahili
+                              ? 'Ukadiriaji na chaguo zilizokusanywa kutoka kwa wateja.'
+                              : 'Aggregated ratings and options collected from respondents.'}
                           </p>
                         </div>
                         {activeFormResponses?.responses && activeFormResponses.responses.length > 0 && (
@@ -975,13 +1010,15 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                             className="px-3 py-1.5 bg-[#006B3C] hover:bg-[#008F50] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
                           >
                             <Download className="w-3.5 h-3.5" />
-                            <span>Export CSV</span>
+                            <span>{isSwahili ? 'Pakua CSV' : 'Export CSV'}</span>
                           </button>
                         )}
                       </div>
 
                       {questionSummaries.length === 0 ? (
-                        <p className="text-xs text-[#8899AA] italic">No question items found in this form.</p>
+                        <p className="text-xs text-[#8899AA] italic">
+                          {isSwahili ? 'Hakuna maswali yaliyopatikana katika fomu hii.' : 'No question items found in this form.'}
+                        </p>
                       ) : (
                         <div className="space-y-4 pt-1">
                           {questionSummaries.map((summary) => (
@@ -993,8 +1030,8 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                                 <div>
                                   <h4 className="text-xs font-semibold text-white">{summary.title}</h4>
                                   <span className="text-[10px] text-[#8899AA]">
-                                    {summary.responseCount} answers recorded
-                                    {summary.average && ` • Average Rating: ${summary.average} / 5.0`}
+                                    {summary.responseCount} {isSwahili ? 'majibu yamerekodiwa' : 'answers recorded'}
+                                    {summary.average && ` • ${isSwahili ? 'Kiwango cha Wastani' : 'Average Rating'}: ${summary.average} / 5.0`}
                                   </span>
                                 </div>
                                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-sm bg-[#1A2E1C] text-[#00C46A]">
@@ -1027,7 +1064,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                                 </div>
                               ) : (
                                 <p className="text-[11px] text-[#8899AA] italic">
-                                  Awaiting first response from courier or client.
+                                  {isSwahili ? 'Inasubiri jibu la kwanza kutoka kwa msafirishaji au mteja.' : 'Awaiting first response from courier or client.'}
                                 </p>
                               )}
                             </div>
@@ -1045,9 +1082,13 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
               <div className="bg-[#122010] border border-[#243447] rounded-xl p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-white">Form Schema & Questions</h3>
+                    <h3 className="text-sm font-bold text-white">
+                      {isSwahili ? 'Muundo wa Fomu na Maswali' : 'Form Schema & Questions'}
+                    </h3>
                     <p className="text-xs text-[#8899AA]">
-                      Detailed breakdown of all input items, validation rules, and choice structures.
+                      {isSwahili
+                        ? 'Ufafanuzi wa kina wa maswali yote, sheria za uthibitishaji, na miundo ya chaguzi.'
+                        : 'Detailed breakdown of all input items, validation rules, and choice structures.'}
                     </p>
                   </div>
                   {activeFormSchema && (
@@ -1058,13 +1099,15 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                       className="px-3 py-1.5 bg-[#1A2E1C] hover:bg-[#243447] text-xs text-white rounded-lg flex items-center gap-1.5 transition-colors"
                     >
                       <ExternalLink className="w-3.5 h-3.5 text-[#00C46A]" />
-                      <span>Edit Schema</span>
+                      <span>{isSwahili ? 'Hariri Muundo' : 'Edit Schema'}</span>
                     </a>
                   )}
                 </div>
 
                 {!activeFormSchema?.items || activeFormSchema.items.length === 0 ? (
-                  <p className="text-xs text-[#8899AA] italic">No question items configured in this form.</p>
+                  <p className="text-xs text-[#8899AA] italic">
+                    {isSwahili ? 'Hakuna maswali yaliyosanidiwa kwenye fomu hii.' : 'No question items configured in this form.'}
+                  </p>
                 ) : (
                   <div className="space-y-3">
                     {activeFormSchema.items.map((item, idx) => {
@@ -1083,7 +1126,9 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                                 <h4 className="text-xs font-semibold text-white flex items-center gap-2">
                                   {item.title}
                                   {q?.required && (
-                                    <span className="text-[10px] text-red-400 font-medium">*Required</span>
+                                    <span className="text-[10px] text-red-400 font-medium">
+                                      {isSwahili ? '*Inahitajika' : '*Required'}
+                                    </span>
                                   )}
                                 </h4>
                                 {item.description && (
@@ -1136,9 +1181,13 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
               <div className="bg-[#122010] border border-[#243447] rounded-xl p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-white">Individual Submissions Log</h3>
+                    <h3 className="text-sm font-bold text-white">
+                      {isSwahili ? 'Kumbukumbu ya Majibu' : 'Individual Submissions Log'}
+                    </h3>
                     <p className="text-xs text-[#8899AA]">
-                      Synchronized record of customer and technician responses.
+                      {isSwahili
+                        ? 'Kumbukumbu iliyosawazishwa ya majibu ya wateja na mafundi.'
+                        : 'Synchronized record of customer and technician responses.'}
                     </p>
                   </div>
                   {activeFormResponses?.responses && activeFormResponses.responses.length > 0 && (
@@ -1147,7 +1196,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                       className="px-3 py-1.5 bg-[#006B3C] hover:bg-[#008F50] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>Download CSV</span>
+                      <span>{isSwahili ? 'Pakua CSV' : 'Download CSV'}</span>
                     </button>
                   )}
                 </div>
@@ -1155,7 +1204,9 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                 {!activeFormResponses?.responses || activeFormResponses.responses.length === 0 ? (
                   <div className="p-8 text-center space-y-2">
                     <Users className="w-8 h-8 text-[#8899AA]/40 mx-auto" />
-                    <p className="text-xs text-[#8899AA]">No responses submitted for this form yet.</p>
+                    <p className="text-xs text-[#8899AA]">
+                      {isSwahili ? 'Bado hakuna majibu yaliyotumwa kwa fomu hii.' : 'No responses submitted for this form yet.'}
+                    </p>
                     {activeFormSchema?.responderUri && (
                       <a
                         href={activeFormSchema.responderUri}
@@ -1163,7 +1214,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                         rel="noreferrer"
                         className="inline-flex items-center gap-1 text-xs text-[#00C46A] hover:underline"
                       >
-                        <span>Submit a test response</span>
+                        <span>{isSwahili ? 'Tuma jibu la majaribio' : 'Submit a test response'}</span>
                         <ExternalLink className="w-3 h-3" />
                       </a>
                     )}
@@ -1180,7 +1231,7 @@ export const GoogleFormsScreen: React.FC<GoogleFormsScreenProps> = ({ onNavigate
                           <div className="flex items-center justify-between text-xs">
                             <span className="font-semibold text-white flex items-center gap-2">
                               <span className="w-2 h-2 rounded-full bg-[#00C46A]" />
-                              Respondent: {resp.respondentEmail || 'Anonymous'}
+                              {isSwahili ? 'Mhojiwa' : 'Respondent'}: {resp.respondentEmail || (isSwahili ? 'Bila Kujulikana' : 'Anonymous')}
                             </span>
                             <span className="text-[#8899AA] font-mono text-[11px]">{submittedAt}</span>
                           </div>

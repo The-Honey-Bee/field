@@ -206,7 +206,7 @@ Analyze this forecast and provide the staff scheduling optimization recommendati
 // Supabase Status Endpoint
 app.get('/api/supabase-status', async (req: Request, res: Response) => {
   const url = process.env.VITE_SUPABASE_URL || 'https://jwlvtpnhibtmalfdcmbu.supabase.co';
-  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpJVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3bHZ0cG5oaWJ0bWFsZmRjbWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyODI0MDUsImV4cCI6MjEwNDg1ODQwNX0.iTioT1eTznBwtEJfglyQTkgtBt8o33BFPYc0Wtg7ETI';
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3bHZ0cG5oaWJ0bWFsZmRjbWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyODI0MDUsImV4cCI6MjEwNDg1ODQwNX0.iTioT1eTznBwtEJfglyQTkgtBt8o33BFPYc0Wtg7ETI';
 
   try {
     const response = await fetch(`${url}/auth/v1/health`, {
@@ -242,6 +242,66 @@ app.get('/api/supabase-status', async (req: Request, res: Response) => {
       error: err.message,
       fallbackMode: 'Local Offline-First Resilience Active',
     });
+  }
+});
+
+// Products catalog endpoint proxying Supabase table https://jwlvtpnhibtmalfdcmbu.supabase.co/rest/v1/products
+app.get('/api/products', async (req: Request, res: Response) => {
+  const url = process.env.VITE_SUPABASE_URL || 'https://jwlvtpnhibtmalfdcmbu.supabase.co';
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3bHZ0cG5oaWJ0bWFsZmRjbWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyODI0MDUsImV4cCI6MjEwNDg1ODQwNX0.iTioT1eTznBwtEJfglyQTkgtBt8o33BFPYc0Wtg7ETI';
+
+  try {
+    let authHeader = (req.headers['authorization'] as string) || '';
+
+    if (!authHeader) {
+      try {
+        const loginRes = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+          method: 'POST',
+          headers: {
+            apikey: anonKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: 'field_staff@zamzam.co.tz',
+            password: 'Password123!',
+          }),
+        });
+        if (loginRes.ok) {
+          const authData = await loginRes.json();
+          if (authData?.access_token) {
+            authHeader = `Bearer ${authData.access_token}`;
+          }
+        }
+      } catch (e) {
+        console.warn('[API] Supabase staff auth attempt failed:', e);
+      }
+    }
+
+    const headers: Record<string, string> = {
+      apikey: anonKey,
+    };
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+
+    const response = await fetch(`${url}/rest/v1/products?select=*&order=id.asc`, {
+      headers,
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return res.json({ success: true, source: 'supabase', products: data });
+    }
+
+    const errorData = await response.json().catch(() => ({}));
+    return res.status(response.status).json({
+      success: false,
+      source: 'supabase',
+      error: errorData,
+      products: [],
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message, products: [] });
   }
 });
 

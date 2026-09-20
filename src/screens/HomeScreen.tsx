@@ -26,7 +26,10 @@ import {
   Compass,
   AlertCircle,
   ClipboardList,
+  Radio,
+  Navigation as NavIcon,
 } from 'lucide-react';
+import { geolocationService } from '../services/geolocation';
 
 interface AiRecommendation {
   recommendedStop: string;
@@ -55,7 +58,50 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const [aiRec, setAiRec] = useState<AiRecommendation | null>(null);
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
 
-  const handleRefreshRecommendation = async () => {
+  // Real-time Geolocation State
+  const [isGpsBroadcasting, setIsGpsBroadcasting] = useState<boolean>(false);
+  const [myGpsCoords, setMyGpsCoords] = useState<any>(null);
+
+  useEffect(() => {
+    setIsGpsBroadcasting(geolocationService.isTrackingActive());
+    const unsub = geolocationService.subscribeToCurrentLocation((loc) => {
+      setMyGpsCoords(loc);
+      setIsGpsBroadcasting(geolocationService.isTrackingActive());
+    });
+    return () => unsub();
+  }, []);
+
+  const handleToggleDeviceGps = async () => {
+    if (isGpsBroadcasting) {
+      geolocationService.stopTracking();
+      setIsGpsBroadcasting(false);
+    } else {
+      if (!user) return;
+      await geolocationService.startTracking(user, (loc) => {
+        setMyGpsCoords(loc);
+        setIsGpsBroadcasting(true);
+      });
+      setIsGpsBroadcasting(true);
+    }
+  };
+
+  const handleRefreshRecommendation = async (force: boolean = false) => {
+    // Check sessionStorage cache first if not forced
+    if (!force) {
+      try {
+        const cachedRaw = sessionStorage.getItem('zamzam_rec_cache');
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          if (cached && Date.now() - cached.savedAt < 5 * 60 * 1000) {
+            setAiRec(cached.data);
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     setIsAiLoading(true);
     try {
       const allOrders = storageService.getOrders();
@@ -63,7 +109,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
       const pending = allOrders.filter((o) => o.status !== 'approved');
 
       if (pending.length === 0 && completed.length === 0) {
-        setAiRec({
+        const defaultRec: AiRecommendation = {
           recommendedStop: 'All Stops Clear',
           reason: 'No active delivery stops currently queued. Add client orders or dispatch tasks to receive real-time AI routing advice.',
           urgency: 'normal',
@@ -73,7 +119,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
             'Verify stock counts before route departure',
           ],
           source: 'system',
-        });
+        };
+        setAiRec(defaultRec);
+        try {
+          sessionStorage.setItem('zamzam_rec_cache', JSON.stringify({ data: defaultRec, savedAt: Date.now() }));
+        } catch {
+          // ignore
+        }
         setIsAiLoading(false);
         return;
       }
@@ -99,6 +151,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
       if (res.ok) {
         const data = await res.json();
         setAiRec(data);
+        try {
+          sessionStorage.setItem('zamzam_rec_cache', JSON.stringify({ data, savedAt: Date.now() }));
+        } catch {
+          // ignore
+        }
       }
     } catch (err) {
       console.warn('AI recommendation request failed:', err);
@@ -285,6 +342,66 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         </div>
       </div>
 
+      {/* Real-time Field GPS Geolocation Tracking Bar */}
+      <div className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#006B3C]/30 text-[#00C46A] border border-[#00C46A]/30 flex items-center justify-center shrink-0">
+            <Radio className={`w-5 h-5 ${isGpsBroadcasting ? 'animate-pulse text-[#00C46A]' : 'text-[#8899AA]'}`} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs sm:text-sm font-bold text-white">
+                {isSwahili ? 'Ufuatiliaji wa Moja kwa Moja wa GPS' : 'Real-Time Geolocation Tracking'}
+              </span>
+              <span
+                className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                  isGpsBroadcasting
+                    ? 'bg-[#00C46A]/20 text-[#00C46A] border-[#00C46A]/30'
+                    : 'bg-[#8899AA]/20 text-[#8899AA] border-[#8899AA]/30'
+                }`}
+              >
+                {isGpsBroadcasting ? 'Broadcasting Live' : 'Standby'}
+              </span>
+            </div>
+            <p className="text-[11px] text-[#8899AA]">
+              {isGpsBroadcasting && myGpsCoords
+                ? `Active GPS Signal: ${myGpsCoords.latitude.toFixed(4)}, ${myGpsCoords.longitude.toFixed(4)} (±${myGpsCoords.accuracy}m)`
+                : isSwahili
+                ? 'Sambaza eneo lako la ugani kwa wasimamizi na uone timu kwenye ramani'
+                : 'Transmit high-accuracy field coordinates to supervisor command center'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* If supervisor/manager, allow jumping straight to map */}
+          {(role === 'supervisor' || role === 'manager') && (
+            <button
+              type="button"
+              onClick={() => onNavigate('supervisor')}
+              className="bg-[#1A2E1C] hover:bg-[#253D28] text-white border border-[#3A5068] hover:border-[#00C46A] px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+            >
+              <NavIcon className="w-3.5 h-3.5 text-[#00C46A]" />
+              <span>{isSwahili ? 'Fungua Ramani ya Ugani' : 'Open Live Map'}</span>
+            </button>
+          )}
+
+          {/* Toggle Device GPS Transmitter */}
+          <button
+            type="button"
+            onClick={handleToggleDeviceGps}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${
+              isGpsBroadcasting
+                ? 'bg-red-500/20 text-red-300 border border-red-500/40 hover:bg-red-500/30'
+                : 'bg-[#006B3C] text-white hover:bg-[#008F50] border border-[#00C46A]/40'
+            }`}
+          >
+            <Radio className="w-3.5 h-3.5" />
+            <span>{isGpsBroadcasting ? 'Stop GPS Broadcast' : 'Broadcast My GPS'}</span>
+          </button>
+        </div>
+      </div>
+
       {/* 3. Recharts Active User Today's Delivery Completion Dashboard */}
       <DeliveryCompletionDashboard
         user={user}
@@ -370,7 +487,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                 </span>
                 <span className="bg-[#00C46A]/20 text-[#00C46A] text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-[#00C46A]/30 flex items-center gap-1">
                   <Zap className="w-3 h-3 text-[#00C46A]" />
-                  <span>Gemini AI</span>
+                  <span>{aiRec?.source === 'logistics_engine' ? 'Logistics Engine' : 'Gemini AI'}</span>
                 </span>
               </div>
               <p className="text-[11px] text-[#8899AA]">
@@ -391,7 +508,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
             <button
               type="button"
-              onClick={handleRefreshRecommendation}
+              onClick={() => handleRefreshRecommendation(true)}
               disabled={isAiLoading}
               title="Re-run route recommendation with Gemini AI"
               className="flex items-center gap-1.5 bg-[#1A2E1C] hover:bg-[#253D28] text-white border border-[#3A5068] hover:border-[#00C46A] px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-60 shadow-sm"

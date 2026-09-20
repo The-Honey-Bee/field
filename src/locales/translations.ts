@@ -89,14 +89,18 @@ export const translations: Record<AppLanguage, TranslationDictionary> = {
 
     // Operational Roles
     'role.field_staff': 'Field Staff',
+    'role.dispatcher': 'Dispatcher',
     'role.supervisor': 'Supervisor',
     'role.manager': 'Manager',
     'role.field_staff_desc': 'Deliveries, POS checkout & EOD reconciliation',
+    'role.dispatcher_desc': 'Route planning, order dispatching & fleet coordination',
     'role.supervisor_desc': 'Order approvals, team live tracking & verification',
     'role.manager_desc': 'Executive fleet intelligence, analytics & stock controls',
     'role.switch_active': 'Switch Active Role',
     'role.tier': 'Operational Role & Access Tier',
     'role.tier_desc': 'Switch your active operational privilege tier to test or execute role-specific duties.',
+    'plant.mwanza': 'Mwanza Plant',
+    'plant.mwanza_leadership': 'Mwanza Plant Leadership: Noah Philemon (Supervisor), Grace Matiku (Dispatcher), Aaliyah Salehe (Manager)',
 
     // Home Screen
     'home.active_shift': 'Active Shift • Route Dispatch',

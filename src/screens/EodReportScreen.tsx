@@ -583,11 +583,11 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
                   <span>{previewModalImage.name}</span>
                 </h3>
                 <span className="text-xs text-[#8899AA]">
-                  Category:{' '}
+                  {isSwahili ? 'Kitengo' : 'Category'}:{' '}
                   <span className="text-[#00C46A] font-semibold capitalize">
-                    {previewModalImage.category || 'General'}
+                    {previewModalImage.category || (isSwahili ? 'Kawaida' : 'General')}
                   </span>{' '}
-                  &bull; Uploaded {previewModalImage.uploadedAt}
+                  &bull; {isSwahili ? 'Imepakiwa' : 'Uploaded'} {previewModalImage.uploadedAt}
                 </span>
               </div>
 
@@ -610,13 +610,15 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
             </div>
 
             <div className="p-4 border-t border-[#2A5038] flex items-center justify-between text-xs">
-              <span className="text-[#8899AA]">Staff Visual Proof Verification</span>
+              <span className="text-[#8899AA]">
+                {isSwahili ? 'Uthibitisho wa Ushahidi wa Picha wa Mfanyakazi' : 'Staff Visual Proof Verification'}
+              </span>
               <button
                 type="button"
                 onClick={() => setPreviewModalImage(null)}
                 className="bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] font-bold px-4 py-1.5 rounded-lg"
               >
-                Done
+                {isSwahili ? 'Nimemaliza' : 'Done'}
               </button>
             </div>
           </div>

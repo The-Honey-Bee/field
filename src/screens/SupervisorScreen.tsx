@@ -3,6 +3,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
 import { Order, EodReport, ProofImage } from '../types';
+import { SupervisorLiveMap } from '../components/SupervisorLiveMap';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -18,6 +19,8 @@ import {
   Eye,
   X,
   ZoomIn,
+  MapPin,
+  Radio,
 } from 'lucide-react';
 
 interface SupervisorScreenProps {
@@ -26,7 +29,7 @@ interface SupervisorScreenProps {
 
 export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }) => {
   const { t, isSwahili } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'orders' | 'reports' | 'team'>('orders');
+  const [activeTab, setActiveTab] = useState<'map' | 'orders' | 'reports' | 'team'>('map');
   const [orders, setOrders] = useState<Order[]>([]);
   const [reports, setReports] = useState<EodReport[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -121,10 +124,12 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
             <ShieldCheck className="w-6 h-6 text-blue-400" />
-            <span>Supervisor Command Center</span>
+            <span>{isSwahili ? 'Kituo cha Usimamizi wa Eneo' : 'Supervisor Command Center'}</span>
           </h1>
           <p className="text-xs text-[#8899AA] mt-0.5">
-            Audit dispatches, verify cash reconciliations, and monitor live field fleet.
+            {isSwahili
+              ? 'Kagua usambazaji, thibitisha upatanisho wa fedha taslimu, na fuatilia meli ya magari nyanjani.'
+              : 'Audit dispatches, verify cash reconciliations, and monitor live field fleet.'}
           </p>
         </div>
       </div>
@@ -137,16 +142,29 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
       )}
 
       {/* Tabs */}
-      <div className="flex bg-[#122010] p-1.5 rounded-xl border border-[#2A5038] gap-1">
+      <div className="flex bg-[#122010] p-1.5 rounded-xl border border-[#2A5038] gap-1 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('map')}
+          className={`flex-1 min-w-[120px] py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'map'
+              ? 'bg-[#006B3C] text-white shadow'
+              : 'text-[#8899AA] hover:text-white'
+          }`}
+        >
+          <Radio className="w-3.5 h-3.5 text-[#00C46A] animate-pulse" />
+          <span>{isSwahili ? 'Ramani ya Moja kwa Moja' : 'Live GPS Map'}</span>
+          <span className="w-2 h-2 rounded-full bg-[#00C46A] animate-ping" />
+        </button>
+
         <button
           onClick={() => setActiveTab('orders')}
-          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 min-w-[120px] py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
             activeTab === 'orders'
               ? 'bg-[#006B3C] text-white shadow'
               : 'text-[#8899AA] hover:text-white'
           }`}
         >
-          <span>Order Approvals</span>
+          <span>{isSwahili ? 'Idhini ya Maagizo' : 'Order Approvals'}</span>
           {pendingOrders.length > 0 && (
             <span className="bg-[#F59E0B] text-[#0A1A0F] text-[10px] font-black px-1.5 py-0.2 rounded-full">
               {pendingOrders.length}
@@ -156,13 +174,13 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
 
         <button
           onClick={() => setActiveTab('reports')}
-          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 min-w-[120px] py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
             activeTab === 'reports'
               ? 'bg-[#006B3C] text-white shadow'
               : 'text-[#8899AA] hover:text-white'
           }`}
         >
-          <span>EOD Reviews</span>
+          <span>{isSwahili ? 'Ripoti za Siku' : 'EOD Reviews'}</span>
           {reports.length > 0 && (
             <span className="bg-[#00C46A] text-[#0A1A0F] text-[10px] font-black px-1.5 py-0.2 rounded-full">
               {reports.length}
@@ -172,30 +190,48 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
 
         <button
           onClick={() => setActiveTab('team')}
-          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 min-w-[120px] py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
             activeTab === 'team'
               ? 'bg-[#006B3C] text-white shadow'
               : 'text-[#8899AA] hover:text-white'
           }`}
         >
-          <span>Team Status</span>
+          <span>{isSwahili ? 'Hali ya Timu' : 'Team Status'}</span>
           <span className="bg-blue-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
             {teamMembers.length}
           </span>
         </button>
       </div>
 
+      {/* TAB 0: Live GPS Map */}
+      {activeTab === 'map' && (
+        <div className="space-y-4">
+          <SupervisorLiveMap onNavigate={onNavigate} />
+        </div>
+      )}
+
       {/* TAB 1: Order Approvals */}
       {activeTab === 'orders' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between text-xs text-[#8899AA]">
-            <span>Showing all field orders awaiting supervisor sign-off</span>
-            <span>Total: {orders.length} orders</span>
+            <span>
+              {isSwahili
+                ? 'Inaonyesha maagizo yote ya nyanjani yanayosubiri idhini ya msimamizi'
+                : 'Showing all field orders awaiting supervisor sign-off'}
+            </span>
+            <span>{isSwahili ? `Jumla: maagizo ${orders.length}` : `Total: ${orders.length} orders`}</span>
           </div>
 
           <div className="space-y-3">
             {orders.map((order) => {
               const isPending = order.status === 'pending';
+              const statusLabel =
+                order.status === 'approved'
+                  ? (isSwahili ? 'Imeidhinishwa' : 'Approved')
+                  : order.status === 'rejected'
+                  ? (isSwahili ? 'Imekataliwa' : 'Rejected')
+                  : (isSwahili ? 'Inasubiri' : 'Pending');
+
               return (
                 <div
                   key={order.id}
@@ -214,22 +250,28 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
                             : 'bg-[#F59E0B]/20 text-[#F59E0B]'
                         }`}
                       >
-                        {order.status || 'pending'}
+                        {statusLabel}
                       </span>
                     </div>
                     <div className="text-xs text-[#8899AA]">
                       {order.items.map((i) => `${i.qty}x ${i.name}`).join(', ')}
                     </div>
                     <div className="text-[11px] text-[#8899AA] flex items-center gap-2">
-                      <span>Payment: <strong className="text-white uppercase">{order.paymentMethod}</strong></span>
+                      <span>
+                        {isSwahili ? 'Malipo:' : 'Payment:'}{' '}
+                        <strong className="text-white uppercase">{order.paymentMethod}</strong>
+                      </span>
                       <span>&bull;</span>
-                      <span>Staff ID: <span className="font-mono text-white">{order.staffId}</span></span>
+                      <span>
+                        {isSwahili ? 'Namba ya Mfanyakazi:' : 'Staff ID:'}{' '}
+                        <span className="font-mono text-white">{order.staffId}</span>
+                      </span>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-[#243447]">
                     <div className="text-left sm:text-right">
-                      <div className="text-xs text-[#8899AA]">Order Subtotal</div>
+                      <div className="text-xs text-[#8899AA]">{isSwahili ? 'Jumla Ndogo' : 'Order Subtotal'}</div>
                       <div className="font-mono font-bold text-white text-base">
                         TZS {order.subtotal.toLocaleString()}
                       </div>
@@ -240,7 +282,7 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
                         <button
                           onClick={() => handleRejectOrder(order.id)}
                           className="p-2 rounded-xl bg-red-950/60 hover:bg-red-900 text-red-400 border border-red-800/40"
-                          title="Reject"
+                          title={isSwahili ? 'Kataa' : 'Reject'}
                         >
                           <XCircle className="w-4 h-4" />
                         </button>
@@ -249,11 +291,13 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
                           className="px-3.5 py-2 rounded-xl bg-[#006B3C] hover:bg-[#008F50] text-white font-bold text-xs flex items-center gap-1.5"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5 text-[#00C46A]" />
-                          <span>Approve</span>
+                          <span>{isSwahili ? 'Idhinisha' : 'Approve'}</span>
                         </button>
                       </div>
                     ) : (
-                      <span className="text-xs text-[#8899AA] italic">Reviewed</span>
+                      <span className="text-xs text-[#8899AA] italic">
+                        {isSwahili ? 'Imekaguliwa' : 'Reviewed'}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -268,118 +312,136 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
         <div className="space-y-4">
           {reports.length === 0 ? (
             <div className="bg-[#122010] p-8 rounded-2xl border border-[#2A5038] text-center text-xs text-[#8899AA]">
-              No End-of-Day reports submitted for review yet. Field staff can submit from the EOD tab.
+              {isSwahili
+                ? 'Hakuna ripoti za Mwisho wa Siku zilizowasilishwa bado. Wafanyakazi wanaweza kuwasilisha kutoka ukurasa wa EOD.'
+                : 'No End-of-Day reports submitted for review yet. Field staff can submit from the EOD tab.'}
             </div>
           ) : (
             <div className="space-y-3">
-              {reports.map((report) => (
-                <div
-                  key={report.id}
-                  className="bg-[#122010] p-5 rounded-2xl border border-[#2A5038] space-y-3"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#243447] pb-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-white">
-                          Staff {report.staffId} EOD Reconciliation
-                        </span>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                            report.syncStatus === 'reviewed'
-                              ? 'bg-[#006B3C]/50 text-[#00C46A]'
-                              : 'bg-blue-900/50 text-blue-300'
-                          }`}
-                        >
-                          {report.syncStatus}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-[#8899AA]">
-                        Submitted {new Date(report.createdAt).toLocaleString()}
-                      </span>
-                    </div>
+              {reports.map((report) => {
+                const syncLabel =
+                  report.syncStatus === 'reviewed'
+                    ? (isSwahili ? 'Imekaguliwa' : 'Reviewed')
+                    : (isSwahili ? 'Inasubiri Uhakiki' : report.syncStatus);
 
-                    <div className="text-right font-mono text-base font-bold text-[#00C46A]">
-                      TZS {report.totalRevenue.toLocaleString()}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 text-xs text-center">
-                    <div className="bg-[#1A2E1C] p-2 rounded-xl border border-[#3A5068]/40">
-                      <div className="text-[#8899AA]">Deliveries</div>
-                      <div className="font-bold text-white mt-0.5">{report.totalDeliveries} stops</div>
-                    </div>
-                    <div className="bg-[#1A2E1C] p-2 rounded-xl border border-[#3A5068]/40">
-                      <div className="text-[#8899AA]">Collected</div>
-                      <div className="font-bold text-white mt-0.5">{report.collectedCount}</div>
-                    </div>
-                    <div className="bg-[#1A2E1C] p-2 rounded-xl border border-[#3A5068]/40">
-                      <div className="text-[#8899AA]">Partial/Pending</div>
-                      <div className="font-bold text-white mt-0.5">{report.partialCount}</div>
-                    </div>
-                  </div>
-
-                  {report.fieldNotes && (
-                    <div className="text-xs bg-[#1A2E1C]/60 p-3 rounded-xl border border-[#3A5068]/30">
-                      <strong className="text-[#8899AA]">Field Notes: </strong>
-                      <span className="text-[#D0E8F0]">{report.fieldNotes}</span>
-                    </div>
-                  )}
-
-                  {report.proofImages && report.proofImages.length > 0 && (
-                    <div className="bg-[#162719] p-3 rounded-xl border border-[#2A5038] space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-white flex items-center gap-1.5">
-                          <Camera className="w-3.5 h-3.5 text-[#00C46A]" />
-                          <span>Attached Visual Proofs ({report.proofImages.length})</span>
-                        </span>
-                        <span className="text-[11px] text-[#8899AA]">Click to inspect full size</span>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        {report.proofImages.map((proof) => (
-                          <button
-                            key={proof.id}
-                            type="button"
-                            onClick={() => setSupervisorPreviewImage(proof)}
-                            className="group relative w-20 h-20 rounded-lg overflow-hidden border border-[#2A5038] hover:border-[#00C46A] transition-all bg-black/40 text-left"
-                            title={proof.name}
+                return (
+                  <div
+                    key={report.id}
+                    className="bg-[#122010] p-5 rounded-2xl border border-[#2A5038] space-y-3"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#243447] pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-white">
+                            {isSwahili
+                              ? `Upatanisho wa Mwisho wa Siku - Mfanyakazi ${report.staffId}`
+                              : `Staff ${report.staffId} EOD Reconciliation`}
+                          </span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                              report.syncStatus === 'reviewed'
+                                ? 'bg-[#006B3C]/50 text-[#00C46A]'
+                                : 'bg-blue-900/50 text-blue-300'
+                            }`}
                           >
-                            <img
-                              src={proof.dataUrl}
-                              alt={proof.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                              referrerPolicy="no-referrer"
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                              <ZoomIn className="w-4 h-4 text-white" />
-                            </div>
-                            <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] text-white px-1 py-0.5 truncate uppercase font-bold text-center">
-                              {proof.category || 'proof'}
-                            </span>
-                          </button>
-                        ))}
+                            {syncLabel}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-[#8899AA]">
+                          {isSwahili ? 'Imewasilishwa' : 'Submitted'}{' '}
+                          {new Date(report.createdAt).toLocaleString(isSwahili ? 'sw-TZ' : 'en-US')}
+                        </span>
+                      </div>
+
+                      <div className="text-right font-mono text-base font-bold text-[#00C46A]">
+                        TZS {report.totalRevenue.toLocaleString()}
                       </div>
                     </div>
-                  )}
 
-                  <div className="flex justify-end pt-1">
-                    {report.syncStatus !== 'reviewed' ? (
-                      <button
-                        onClick={() => handleReviewReport(report.id)}
-                        className="bg-[#006B3C] hover:bg-[#008F50] text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"
-                      >
-                        <FileCheck className="w-4 h-4 text-[#00C46A]" />
-                        <span>Sign-off & Reconcile</span>
-                      </button>
-                    ) : (
-                      <span className="text-xs text-[#00C46A] flex items-center gap-1 font-semibold">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Supervisor Sign-Off Completed</span>
-                      </span>
+                    <div className="grid grid-cols-3 gap-2 text-xs text-center">
+                      <div className="bg-[#1A2E1C] p-2 rounded-xl border border-[#3A5068]/40">
+                        <div className="text-[#8899AA]">{isSwahili ? 'Usambazaji' : 'Deliveries'}</div>
+                        <div className="font-bold text-white mt-0.5">
+                          {report.totalDeliveries} {isSwahili ? 'vituo' : 'stops'}
+                        </div>
+                      </div>
+                      <div className="bg-[#1A2E1C] p-2 rounded-xl border border-[#3A5068]/40">
+                        <div className="text-[#8899AA]">{isSwahili ? 'Zilizokusanywa' : 'Collected'}</div>
+                        <div className="font-bold text-white mt-0.5">{report.collectedCount}</div>
+                      </div>
+                      <div className="bg-[#1A2E1C] p-2 rounded-xl border border-[#3A5068]/40">
+                        <div className="text-[#8899AA]">{isSwahili ? 'Zinazosubiri' : 'Partial/Pending'}</div>
+                        <div className="font-bold text-white mt-0.5">{report.partialCount}</div>
+                      </div>
+                    </div>
+
+                    {report.fieldNotes && (
+                      <div className="text-xs bg-[#1A2E1C]/60 p-3 rounded-xl border border-[#3A5068]/30">
+                        <strong className="text-[#8899AA]">{isSwahili ? 'Maelezo ya Uwandani: ' : 'Field Notes: '}</strong>
+                        <span className="text-[#D0E8F0]">{report.fieldNotes}</span>
+                      </div>
                     )}
+
+                    {report.proofImages && report.proofImages.length > 0 && (
+                      <div className="bg-[#162719] p-3 rounded-xl border border-[#2A5038] space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-white flex items-center gap-1.5">
+                            <Camera className="w-3.5 h-3.5 text-[#00C46A]" />
+                            <span>
+                              {isSwahili ? 'Uthibitisho wa Picha' : 'Attached Visual Proofs'} ({report.proofImages.length})
+                            </span>
+                          </span>
+                          <span className="text-[11px] text-[#8899AA]">
+                            {isSwahili ? 'Bofya kukagua picha' : 'Click to inspect full size'}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          {report.proofImages.map((proof) => (
+                            <button
+                              key={proof.id}
+                              type="button"
+                              onClick={() => setSupervisorPreviewImage(proof)}
+                              className="group relative w-20 h-20 rounded-lg overflow-hidden border border-[#2A5038] hover:border-[#00C46A] transition-all bg-black/40 text-left"
+                              title={proof.name}
+                            >
+                              <img
+                                src={proof.dataUrl}
+                                alt={proof.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                referrerPolicy="no-referrer"
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <ZoomIn className="w-4 h-4 text-white" />
+                              </div>
+                              <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] text-white px-1 py-0.5 truncate uppercase font-bold text-center">
+                                {proof.category || 'proof'}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end pt-1">
+                      {report.syncStatus !== 'reviewed' ? (
+                        <button
+                          onClick={() => handleReviewReport(report.id)}
+                          className="bg-[#006B3C] hover:bg-[#008F50] text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"
+                        >
+                          <FileCheck className="w-4 h-4 text-[#00C46A]" />
+                          <span>{isSwahili ? 'Weka Sahihi na Funga Hesabu' : 'Sign-off & Reconcile'}</span>
+                        </button>
+                      ) : (
+                        <span className="text-xs text-[#00C46A] flex items-center gap-1 font-semibold">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>{isSwahili ? 'Sahihi ya Msimamizi Imekamilika' : 'Supervisor Sign-Off Completed'}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -391,9 +453,13 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
           {teamMembers.length === 0 ? (
             <div className="text-center py-12 px-4 bg-[#122010] rounded-2xl border border-dashed border-[#2A5038] space-y-3">
               <Users className="w-10 h-10 mx-auto text-[#00C46A]/50" />
-              <h3 className="text-base font-bold text-white">No Team Profiles Yet</h3>
+              <h3 className="text-base font-bold text-white">
+                {isSwahili ? 'Hakuna Wasifu wa Timu Bado' : 'No Team Profiles Yet'}
+              </h3>
               <p className="text-xs text-[#8899AA] max-w-sm mx-auto">
-                Staff members who register accounts through the authentication portal will automatically appear in this supervisory dashboard.
+                {isSwahili
+                  ? 'Wafanyakazi wanaojisajili kupitia tovuti ya kuingia wataonekana moja kwa moja kwenye dashibodi hii ya usimamizi.'
+                  : 'Staff members who register accounts through the authentication portal will automatically appear in this supervisory dashboard.'}
               </p>
             </div>
           ) : (
@@ -413,24 +479,39 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
                         <span className="font-mono text-xs text-[#8899AA]">({member.id})</span>
                       </div>
                       <div className="text-xs text-[#8899AA] mt-0.5">{member.route}</div>
-                      <div className="text-[10px] text-[#00C46A] mt-0.5">Last Sync: {member.lastSync}</div>
+                      <div className="text-[10px] text-[#00C46A] mt-0.5">
+                        {isSwahili ? 'Usawazishaji wa Mwisho:' : 'Last Sync:'} {member.lastSync}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-6">
+                  <div className="flex items-center justify-between sm:justify-end gap-4">
                     <div>
-                      <div className="text-[10px] text-[#8899AA]">Stops Completed</div>
+                      <div className="text-[10px] text-[#8899AA]">
+                        {isSwahili ? 'Vituo Vilivyokamilika' : 'Stops Completed'}
+                      </div>
                       <div className="font-mono text-xs font-bold text-white">
                         {member.stopsCompleted} / {member.totalStops}
                       </div>
                     </div>
 
                     <div className="text-right">
-                      <div className="text-[10px] text-[#8899AA]">Shift Revenue</div>
+                      <div className="text-[10px] text-[#8899AA]">
+                        {isSwahili ? 'Mapato ya Zamu' : 'Shift Revenue'}
+                      </div>
                       <div className="font-mono text-sm font-bold text-[#00C46A]">
                         TZS {member.revenue.toLocaleString()}
                       </div>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('map')}
+                      className="bg-[#006B3C]/30 hover:bg-[#006B3C] text-[#00C46A] hover:text-white border border-[#00C46A]/40 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+                    >
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>{isSwahili ? 'Tazama Ramani' : 'Locate on Map'}</span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -456,11 +537,11 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
                   <span>{supervisorPreviewImage.name}</span>
                 </h3>
                 <span className="text-xs text-[#8899AA]">
-                  Verification Category:{' '}
+                  {isSwahili ? 'Kundi la Uhakiki:' : 'Verification Category:'}{' '}
                   <span className="text-[#00C46A] font-semibold uppercase">
                     {supervisorPreviewImage.category || 'General Proof'}
                   </span>{' '}
-                  &bull; Time: {supervisorPreviewImage.uploadedAt}
+                  &bull; {isSwahili ? 'Saa:' : 'Time:'} {supervisorPreviewImage.uploadedAt}
                 </span>
               </div>
 
@@ -483,13 +564,15 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
             </div>
 
             <div className="p-4 border-t border-[#2A5038] flex items-center justify-between text-xs">
-              <span className="text-[#8899AA]">Supervisor Visual Proof Inspection</span>
+              <span className="text-[#8899AA]">
+                {isSwahili ? 'Ukaguzi wa Picha za Uthibitisho' : 'Supervisor Visual Proof Inspection'}
+              </span>
               <button
                 type="button"
                 onClick={() => setSupervisorPreviewImage(null)}
                 className="bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] font-bold px-4 py-1.5 rounded-lg"
               >
-                Close Preview
+                {isSwahili ? 'Funga Mwonekano' : 'Close Preview'}
               </button>
             </div>
           </div>

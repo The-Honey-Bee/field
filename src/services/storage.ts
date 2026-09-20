@@ -25,6 +25,7 @@ const STORAGE_KEYS = {
   USER_PROFILE: 'zamzam_user_profile',
   BIOMETRICS: 'zamzam_biometric_credentials',
   LAST_SYNC: 'zamzam_last_sync_timestamp',
+  PRODUCTS: 'zamzam_products',
 };
 
 // Production catalog for Zamzam pure water products
@@ -250,6 +251,91 @@ class StorageService {
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.LAST_SYNC, timestamp);
     }
+  }
+
+  // --- Products Catalog (Supabase Table: https://jwlvtpnhibtmalfdcmbu.supabase.co/rest/v1/products) ---
+  public getProducts(): Product[] {
+    if (typeof window === 'undefined') return INITIAL_PRODUCTS;
+    const raw = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
+    if (!raw) return INITIAL_PRODUCTS;
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {
+      // fallback
+    }
+    return INITIAL_PRODUCTS;
+  }
+
+  public saveProducts(products: Product[]): void {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+    }
+  }
+
+  public async fetchProductsFromCloud(): Promise<Product[]> {
+    // 1. Try direct Supabase query
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('id', { ascending: true });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const mapped = this.mapSupabaseProducts(data);
+        this.saveProducts(mapped);
+        return mapped;
+      }
+    } catch (err) {
+      console.warn('[Storage] Direct Supabase product query fallback:', err);
+    }
+
+    // 2. Try proxy endpoint /api/products which connects to https://jwlvtpnhibtmalfdcmbu.supabase.co/rest/v1/products
+    try {
+      const res = await fetch('/api/products');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.products) && json.products.length > 0) {
+          const mapped = this.mapSupabaseProducts(json.products);
+          this.saveProducts(mapped);
+          return mapped;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[Storage] API products query fallback:', apiErr);
+    }
+
+    return this.getProducts();
+  }
+
+  private mapSupabaseProducts(rows: any[]): Product[] {
+    return rows.map((p: any) => {
+      const name = String(p.name || 'ZAMZAM Pure Drinking Water');
+      const sizeMatch = name.match(/(18\.9L\/R-NEW|18\.9L\/R|18\.9L|13L|\d+(?:\.\d+)?\s*[a-zA-Z\/]+)/i);
+      const size = p.size || (sizeMatch ? sizeMatch[1] : '18.9L');
+
+      let unit = p.unit;
+      if (!unit) {
+        if (name.includes('Refill') || (name.includes('/R') && !name.includes('NEW'))) {
+          unit = 'Bottle (Refill)';
+        } else if (name.includes('NEW')) {
+          unit = 'New Bottle + Water';
+        } else {
+          unit = 'Bottle';
+        }
+      }
+
+      return {
+        id: p.id ? String(p.id) : `prod-${Math.random().toString(36).slice(2, 7)}`,
+        name: name,
+        size: size,
+        price: Number(p.price) || 5000,
+        unit: unit,
+        stockAvailable: Number(p.stock_available ?? p.stockAvailable ?? (name.includes('13L') ? 150 : 200)),
+        description: p.description || undefined,
+        currency: p.currency || 'TZS',
+      };
+    });
   }
 
   // --- Customers ---

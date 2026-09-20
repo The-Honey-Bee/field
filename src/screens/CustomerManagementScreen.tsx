@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storage';
 import { Customer } from '../types';
+import { useLanguage } from '../context/LanguageContext';
 import {
   Users,
   Search,
@@ -19,6 +20,7 @@ interface CustomerManagementScreenProps {
 }
 
 export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> = ({ onNavigate }) => {
+  const { isSwahili } = useLanguage();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
@@ -49,15 +51,22 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
     setPhone('');
     setAddress('');
     setShowAddModal(false);
-    setFeedback(`Customer "${name}" registered successfully`);
+    setFeedback(
+      isSwahili
+        ? `Mteja "${name}" amesajiliwa kikamilifu`
+        : `Customer "${name}" registered successfully`
+    );
     setTimeout(() => setFeedback(null), 3000);
   };
 
   const handleDelete = (id: string, custName: string) => {
-    if (confirm(`Remove "${custName}" from client registry?`)) {
+    const confirmPrompt = isSwahili
+      ? `Ondoa "${custName}" kwenye orodha ya wateja?`
+      : `Remove "${custName}" from client registry?`;
+    if (confirm(confirmPrompt)) {
       storageService.deleteCustomer(id);
       setCustomers(storageService.getCustomers());
-      setFeedback(`Customer removed`);
+      setFeedback(isSwahili ? 'Mteja ameondolewa' : 'Customer removed');
       setTimeout(() => setFeedback(null), 3000);
     }
   };
@@ -76,10 +85,12 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
             <Users className="w-6 h-6 text-[#00C46A]" />
-            <span>Customer & Client Directory</span>
+            <span>{isSwahili ? 'Orodha ya Wateja na Makampuni' : 'Customer & Client Directory'}</span>
           </h1>
           <p className="text-xs text-[#8899AA] mt-0.5">
-            Manage dispatch delivery addresses, phone contacts, and rapid ordering.
+            {isSwahili
+              ? 'Simamia anwani za uwasilishaji, mawasiliano ya simu, na uagizaji wa haraka.'
+              : 'Manage dispatch delivery addresses, phone contacts, and rapid ordering.'}
           </p>
         </div>
 
@@ -88,7 +99,7 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
           className="bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Customer</span>
+          <span>{isSwahili ? 'Sajili Mteja' : 'Add Customer'}</span>
         </button>
       </div>
 
@@ -106,7 +117,11 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by business name, phone number, or street address..."
+          placeholder={
+            isSwahili
+              ? 'Tafuta kwa jina la biashara, nambari ya simu, au anwani ya mtaa...'
+              : 'Search by business name, phone number, or street address...'
+          }
           className="w-full bg-transparent text-xs text-white placeholder-[#8899AA] focus:outline-none"
         />
       </div>
@@ -115,18 +130,22 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
       {filtered.length === 0 ? (
         <div className="text-center py-12 px-4 bg-[#122010] rounded-2xl border border-dashed border-[#2A5038] space-y-3">
           <Users className="w-10 h-10 mx-auto text-[#00C46A]/50" />
-          <h3 className="text-base font-bold text-white">No Customers Found</h3>
+          <h3 className="text-base font-bold text-white">
+            {isSwahili ? 'Hakuna Wateja Waliopatikana' : 'No Customers Found'}
+          </h3>
           <p className="text-xs text-[#8899AA] max-w-sm mx-auto">
             {search
-              ? `No customer records matched "${search}".`
-              : 'The customer directory is clean. Register your first commercial store, restaurant, or residential delivery point.'}
+              ? (isSwahili ? `Hakuna mteja anayelingana na "${search}".` : `No customer records matched "${search}".`)
+              : (isSwahili
+                  ? 'Orodha ya wateja haina kumbukumbu. Sajili duka lako la kwanza la biashara, mgahawa, au eneo la makazi.'
+                  : 'The customer directory is clean. Register your first commercial store, restaurant, or residential delivery point.')}
           </p>
           <button
             onClick={() => setShowAddModal(true)}
             className="inline-flex items-center gap-1.5 bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] font-bold px-4 py-2 rounded-xl text-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>Add First Customer</span>
+            <span>{isSwahili ? 'Sajili Mteja wa Kwanza' : 'Add First Customer'}</span>
           </button>
         </div>
       ) : (
@@ -145,7 +164,7 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
                   <button
                     onClick={() => handleDelete(c.id, c.name)}
                     className="text-[#8899AA] hover:text-red-400 p-1 transition-colors"
-                    title="Delete Customer"
+                    title={isSwahili ? 'Futa Mteja' : 'Delete Customer'}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -171,17 +190,17 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
                 <button
                   onClick={() => onNavigate('forms')}
                   className="flex items-center gap-1.5 text-xs text-[#8899AA] hover:text-[#00C46A] transition-colors font-medium"
-                  title="Open Customer Satisfaction Survey in Google Forms"
+                  title={isSwahili ? 'Fungua Utafiti wa Kuridhika kwa Wateja katika Google Forms' : 'Open Customer Satisfaction Survey in Google Forms'}
                 >
                   <ClipboardList className="w-3.5 h-3.5" />
-                  <span>Google Survey</span>
+                  <span>{isSwahili ? 'Utafiti wa Google' : 'Google Survey'}</span>
                 </button>
                 <button
                   onClick={() => onNavigate('orders')}
                   className="flex items-center gap-1.5 text-xs text-[#00C46A] hover:text-white font-semibold"
                 >
                   <ShoppingCart className="w-3.5 h-3.5" />
-                  <span>Create Order</span>
+                  <span>{isSwahili ? 'Unda Agizo' : 'Create Order'}</span>
                 </button>
               </div>
             </div>
@@ -193,21 +212,27 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#122010] border border-[#3A5068] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <h2 className="text-lg font-bold text-white">Add Customer to Directory</h2>
+            <h2 className="text-lg font-bold text-white">
+              {isSwahili ? 'Sajili Mteja Kwenye Orodha' : 'Add Customer to Directory'}
+            </h2>
             <form onSubmit={handleAddCustomer} className="space-y-3">
               <div>
-                <label className="text-xs text-[#8899AA] block mb-1">Company / Customer Name *</label>
+                <label className="text-xs text-[#8899AA] block mb-1">
+                  {isSwahili ? 'Jina la Kampuni / Mteja *' : 'Company / Customer Name *'}
+                </label>
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Tanzanite Plaza"
+                  placeholder={isSwahili ? 'mfano: Tanzanite Plaza' : 'e.g. Tanzanite Plaza'}
                   className="w-full bg-[#1A2E1C] border border-[#3A5068] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#00C46A]"
                 />
               </div>
               <div>
-                <label className="text-xs text-[#8899AA] block mb-1">Phone Number</label>
+                <label className="text-xs text-[#8899AA] block mb-1">
+                  {isSwahili ? 'Nambari ya Simu' : 'Phone Number'}
+                </label>
                 <input
                   type="text"
                   value={phone}
@@ -217,12 +242,14 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
                 />
               </div>
               <div>
-                <label className="text-xs text-[#8899AA] block mb-1">Physical Delivery Address</label>
+                <label className="text-xs text-[#8899AA] block mb-1">
+                  {isSwahili ? 'Anwani ya Uwasilishaji' : 'Physical Delivery Address'}
+                </label>
                 <input
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Street / District / Floor"
+                  placeholder={isSwahili ? 'Mtaa / Wilaya / Ghorofa' : 'Street / District / Floor'}
                   className="w-full bg-[#1A2E1C] border border-[#3A5068] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#00C46A]"
                 />
               </div>
@@ -233,13 +260,13 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
                   onClick={() => setShowAddModal(false)}
                   className="flex-1 px-4 py-2.5 rounded-xl border border-[#3A5068] text-[#8899AA] hover:text-white text-xs font-semibold"
                 >
-                  Cancel
+                  {isSwahili ? 'Ghairi' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
                   className="flex-1 px-4 py-2.5 rounded-xl bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] text-xs font-bold"
                 >
-                  Save
+                  {isSwahili ? 'Hifadhi' : 'Save'}
                 </button>
               </div>
             </form>

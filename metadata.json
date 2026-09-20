@@ -1,9 +1,10 @@
 {
-  "name": "Zamzam Field",
-  "description": "Field operations, order dispatch, delivery tracking, and supervisor monitoring platform for Zamzam.",
+  "name": "Zamzam Field - Mwanza Plant",
+  "description": "Field operations, order dispatch, delivery tracking, and supervisor monitoring platform for Zamzam Mwanza Plant under Supervisor Noah Philemon, Dispatcher Grace Matiku, and Manager Aaliyah Salehe.",
   "requestFramePermissions": [
     "camera",
-    "microphone"
+    "microphone",
+    "geolocation"
   ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

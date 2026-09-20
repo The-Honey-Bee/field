@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storage';
 import { ActivityLogEntry } from '../types';
+import { useLanguage } from '../context/LanguageContext';
 import {
   History,
   Search,
@@ -17,6 +18,7 @@ interface ActivityLogScreenProps {
 }
 
 export const ActivityLogScreen: React.FC<ActivityLogScreenProps> = () => {
+  const { isSwahili } = useLanguage();
   const [logs, setLogs] = useState<ActivityLogEntry[]>([]);
   const [filterAction, setFilterAction] = useState<string>('all');
   const [search, setSearch] = useState<string>('');
@@ -26,12 +28,12 @@ export const ActivityLogScreen: React.FC<ActivityLogScreenProps> = () => {
   }, []);
 
   const filterOptions = [
-    { id: 'all', label: 'All Events' },
-    { id: 'order_approved', label: 'Approvals' },
-    { id: 'order_rejected', label: 'Rejections' },
-    { id: 'sync_success', label: 'Syncs' },
-    { id: 'user_login', label: 'Logins' },
-    { id: 'eod_submitted', label: 'EOD Reports' },
+    { id: 'all', label: isSwahili ? 'Matukio Yote' : 'All Events' },
+    { id: 'order_approved', label: isSwahili ? 'Uidhinishaji' : 'Approvals' },
+    { id: 'order_rejected', label: isSwahili ? 'Kukataliwa' : 'Rejections' },
+    { id: 'sync_success', label: isSwahili ? 'Usawazishaji' : 'Syncs' },
+    { id: 'user_login', label: isSwahili ? 'Kuingia' : 'Logins' },
+    { id: 'eod_submitted', label: isSwahili ? 'Ripoti za EOD' : 'EOD Reports' },
   ];
 
   const filteredLogs = logs.filter((log) => {
@@ -64,10 +66,12 @@ export const ActivityLogScreen: React.FC<ActivityLogScreenProps> = () => {
       <div className="border-b border-[#243447] pb-4">
         <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
           <History className="w-6 h-6 text-[#00C46A]" />
-          <span>Operational Audit Trail & Activity Logs</span>
+          <span>{isSwahili ? 'Kumbukumbu za Uendeshaji na Shughuli' : 'Operational Audit Trail & Activity Logs'}</span>
         </h1>
         <p className="text-xs text-[#8899AA] mt-0.5">
-          Immutable log of dispatch approvals, sync events, user sessions, and order creations.
+          {isSwahili
+            ? 'Kumbukumbu ya idhini za usafirishaji, matukio ya kusawazisha, vipindi vya watumiaji, na uundaji wa maagizo.'
+            : 'Immutable log of dispatch approvals, sync events, user sessions, and order creations.'}
         </p>
       </div>
 
@@ -79,7 +83,7 @@ export const ActivityLogScreen: React.FC<ActivityLogScreenProps> = () => {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search activity records..."
+            placeholder={isSwahili ? 'Tafuta kumbukumbu za shughuli...' : 'Search activity records...'}
             className="w-full bg-transparent text-xs text-white placeholder-[#8899AA] focus:outline-none"
           />
         </div>
@@ -105,7 +109,9 @@ export const ActivityLogScreen: React.FC<ActivityLogScreenProps> = () => {
       <div className="bg-[#122010] p-5 rounded-2xl border border-[#2A5038] space-y-3">
         {filteredLogs.length === 0 ? (
           <div className="text-center py-8 text-xs text-[#8899AA]">
-            No activity logs match the selected filter.
+            {isSwahili
+              ? 'Hakuna kumbukumbu za shughuli zinazolingana na kichujio kilichochaguliwa.'
+              : 'No activity logs match the selected filter.'}
           </div>
         ) : (
           <div className="divide-y divide-[#243447]">
@@ -123,9 +129,15 @@ export const ActivityLogScreen: React.FC<ActivityLogScreenProps> = () => {
                     </span>
                   </div>
                   <div className="text-[11px] text-[#8899AA] mt-1 flex items-center gap-3">
-                    <span>Operator: <strong className="text-[#D0E8F0]">{log.userName}</strong></span>
+                    <span>
+                      {isSwahili ? 'Mhudumu:' : 'Operator:'}{' '}
+                      <strong className="text-[#D0E8F0]">{log.userName}</strong>
+                    </span>
                     <span>&bull;</span>
-                    <span>Role: <strong className="text-[#00C46A]">{log.userRole}</strong></span>
+                    <span>
+                      {isSwahili ? 'Wajibu:' : 'Role:'}{' '}
+                      <strong className="text-[#00C46A]">{log.userRole}</strong>
+                    </span>
                   </div>
                 </div>
               </div>

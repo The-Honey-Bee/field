@@ -40,6 +40,7 @@ import {
   SchedulingOptimizationAdvice,
 } from '../services/forecasting';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface DeliveryForecastOptimizerProps {
   orders: Order[];
@@ -51,6 +52,7 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
   tasks = [],
 }) => {
   const { isSunlight } = useTheme();
+  const { isSwahili } = useLanguage();
 
   // Configuration State
   const [horizon, setHorizon] = useState<7 | 14>(7);
@@ -205,13 +207,15 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
               </span>
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                  <span>Predictive Delivery & Staffing Forecast</span>
+                  <span>{isSwahili ? 'Utabiri wa Utoaji na Upangaji Wafanyakazi' : 'Predictive Delivery & Staffing Forecast'}</span>
                   <span className="text-[10px] uppercase font-bold bg-[#006B3C] text-white px-2 py-0.5 rounded-full border border-[#00C46A]/40">
-                    Confidence: {forecastSummary.confidenceScore}%
+                    {isSwahili ? 'Uhakika:' : 'Confidence:'} {forecastSummary.confidenceScore}%
                   </span>
                 </h2>
                 <p className="text-xs text-[#8899AA] mt-0.5">
-                  Statistical regression model combining historical orders, day-of-week seasonality, and fleet capacity targets.
+                  {isSwahili
+                    ? 'Muundo wa takwimu unaochanganya maagizo ya zamani, msimu wa siku za wiki, na malengo ya uwezo wa meli.'
+                    : 'Statistical regression model combining historical orders, day-of-week seasonality, and fleet capacity targets.'}
                 </p>
               </div>
             </div>
@@ -228,7 +232,7 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
                   horizon === 7 ? 'bg-[#006B3C] text-white shadow-sm' : 'text-[#8899AA] hover:text-white'
                 }`}
               >
-                Next 7 Days
+                {isSwahili ? 'Siku 7 Zijazo' : 'Next 7 Days'}
               </button>
               <button
                 type="button"
@@ -237,22 +241,28 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
                   horizon === 14 ? 'bg-[#006B3C] text-white shadow-sm' : 'text-[#8899AA] hover:text-white'
                 }`}
               >
-                Next 14 Days
+                {isSwahili ? 'Siku 14 Zijazo' : 'Next 14 Days'}
               </button>
             </div>
 
             {/* Scenario Dropdown */}
             <div className="flex items-center bg-[#1A2E1C] px-2.5 py-1.5 rounded-xl border border-[#3A5068] text-xs">
-              <span className="text-[#8899AA] mr-1.5 font-medium">Demand:</span>
+              <span className="text-[#8899AA] mr-1.5 font-medium">{isSwahili ? 'Mahitaji:' : 'Demand:'}</span>
               <select
                 aria-label="Demand Scenario"
                 value={scenario}
                 onChange={(e) => setScenario(e.target.value as any)}
                 className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"
               >
-                <option value="normal" className="bg-[#122010] text-white">Normal Baseline</option>
-                <option value="heatwave" className="bg-[#122010] text-white">Heatwave Surge (+25%)</option>
-                <option value="monsoon" className="bg-[#122010] text-white">Rain / Road Delays (-12%)</option>
+                <option value="normal" className="bg-[#122010] text-white">
+                  {isSwahili ? 'Kiwango cha Kawaida' : 'Normal Baseline'}
+                </option>
+                <option value="heatwave" className="bg-[#122010] text-white">
+                  {isSwahili ? 'Ongezeko la Joto (+25%)' : 'Heatwave Surge (+25%)'}
+                </option>
+                <option value="monsoon" className="bg-[#122010] text-white">
+                  {isSwahili ? 'Mvua / Foleni za Barabara (-12%)' : 'Rain / Road Delays (-12%)'}
+                </option>
               </select>
             </div>
 
@@ -268,7 +278,7 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
               title="Adjust driver capacity and fleet parameters"
             >
               <Sliders className="w-4 h-4" />
-              <span className="hidden sm:inline">Fleet Tuning</span>
+              <span className="hidden sm:inline">{isSwahili ? 'Mipangilio ya Meli' : 'Fleet Tuning'}</span>
             </button>
 
             {/* Export Roster CSV */}
@@ -289,8 +299,10 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
             {/* Target Stops Per Driver */}
             <div>
               <div className="flex justify-between text-xs text-[#8899AA] mb-1">
-                <span>Driver Capacity Target:</span>
-                <strong className="text-white font-mono">{targetStopsPerDriver} stops/day</strong>
+                <span>{isSwahili ? 'Lengo la Kazi ya Dereva:' : 'Driver Capacity Target:'}</span>
+                <strong className="text-white font-mono">
+                  {targetStopsPerDriver} {isSwahili ? 'vituo/siku' : 'stops/day'}
+                </strong>
               </div>
               <input
                 type="range"
@@ -302,15 +314,17 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
                 className="w-full accent-[#00C46A] cursor-pointer"
               />
               <span className="text-[10px] text-[#8899AA] block mt-0.5">
-                Standard route workload in urban Dar es Salaam
+                {isSwahili ? 'Kiwango cha kawaida cha kazi ya njia Dar es Salaam' : 'Standard route workload in urban Dar es Salaam'}
               </span>
             </div>
 
             {/* Active Driver Pool */}
             <div>
               <div className="flex justify-between text-xs text-[#8899AA] mb-1">
-                <span>Active Driver Pool:</span>
-                <strong className="text-white font-mono">{activeDriverPool} Drivers</strong>
+                <span>{isSwahili ? 'Madereva Waliopo:' : 'Active Driver Pool:'}</span>
+                <strong className="text-white font-mono">
+                  {activeDriverPool} {isSwahili ? 'Madereva' : 'Drivers'}
+                </strong>
               </div>
               <input
                 type="range"
@@ -322,15 +336,17 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
                 className="w-full accent-[#00C46A] cursor-pointer"
               />
               <span className="text-[10px] text-[#8899AA] block mt-0.5">
-                Fleet max daily capacity: {maxFleetDailyCapacity} stops
+                {isSwahili ? `Upeo wa vituo vya meli kwa siku: ${maxFleetDailyCapacity}` : `Fleet max daily capacity: ${maxFleetDailyCapacity} stops`}
               </span>
             </div>
 
             {/* Vehicle Bottle Capacity */}
             <div>
               <div className="flex justify-between text-xs text-[#8899AA] mb-1">
-                <span>Truck Capacity (18.9L):</span>
-                <strong className="text-white font-mono">{truckCapacity} bottles</strong>
+                <span>{isSwahili ? 'Uwezo wa Lori (18.9L):' : 'Truck Capacity (18.9L):'}</span>
+                <strong className="text-white font-mono">
+                  {truckCapacity} {isSwahili ? 'chupa' : 'bottles'}
+                </strong>
               </div>
               <input
                 type="range"
@@ -342,7 +358,7 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
                 className="w-full accent-[#00C46A] cursor-pointer"
               />
               <span className="text-[10px] text-[#8899AA] block mt-0.5">
-                Standard 3-ton Isuzu vs light van payload
+                {isSwahili ? 'Uwezo wa gari la tani 3 Isuzu dhidi ya gari dogo' : 'Standard 3-ton Isuzu vs light van payload'}
               </span>
             </div>
           </div>
@@ -361,54 +377,72 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
         {/* Total Projected Stops */}
         <div className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038]">
           <div className="flex items-center justify-between text-xs text-[#8899AA]">
-            <span>Projected {horizon}-Day Volume</span>
+            <span>
+              {isSwahili ? `Makadirio ya Siku ${horizon}` : `Projected ${horizon}-Day Volume`}
+            </span>
             <TrendingUp className="w-4 h-4 text-[#00C46A]" />
           </div>
           <div className="text-2xl font-bold font-mono text-white mt-1.5">
-            {forecastSummary.totalProjectedStops} stops
+            {forecastSummary.totalProjectedStops} {isSwahili ? 'vituo' : 'stops'}
           </div>
           <div className="text-[11px] text-[#8899AA] mt-1 flex items-center justify-between">
-            <span>Avg {forecastSummary.avgDailyStops}/day</span>
-            <span className="text-[#00C46A] font-semibold">{forecastSummary.totalProjectedBottles.toLocaleString()} bottles</span>
+            <span>
+              {isSwahili
+                ? `Wastani ${forecastSummary.avgDailyStops}/siku`
+                : `Avg ${forecastSummary.avgDailyStops}/day`}
+            </span>
+            <span className="text-[#00C46A] font-semibold">
+              {forecastSummary.totalProjectedBottles.toLocaleString()} {isSwahili ? 'chupa' : 'bottles'}
+            </span>
           </div>
         </div>
 
         {/* Peak Surge Day */}
         <div className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038]">
           <div className="flex items-center justify-between text-xs text-[#8899AA]">
-            <span>Peak Demand Window</span>
+            <span>{isSwahili ? 'Kipindi cha Mahitaji ya Juu' : 'Peak Demand Window'}</span>
             <Calendar className="w-4 h-4 text-amber-400" />
           </div>
           <div className="text-xl sm:text-2xl font-bold font-mono text-white mt-1.5 truncate">
             {forecastSummary.peakDay.dayLabel}
           </div>
           <div className="text-[11px] text-amber-400 font-semibold mt-1">
-            {forecastSummary.peakDay.stops} stops &bull; {forecastSummary.peakDay.driversNeeded} drivers needed
+            {isSwahili
+              ? `${forecastSummary.peakDay.stops} vituo • madereva ${forecastSummary.peakDay.driversNeeded} wanahitajika`
+              : `${forecastSummary.peakDay.stops} stops • ${forecastSummary.peakDay.driversNeeded} drivers needed`}
           </div>
         </div>
 
         {/* Fleet Staffing Health */}
         <div className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038]">
           <div className="flex items-center justify-between text-xs text-[#8899AA]">
-            <span>Staffing Capacity Health</span>
+            <span>{isSwahili ? 'Afya ya Uwezo wa Wafanyakazi' : 'Staffing Capacity Health'}</span>
             <Users className="w-4 h-4 text-blue-400" />
           </div>
           <div className="text-2xl font-bold font-mono text-white mt-1.5">
             {forecastSummary.understaffedDaysCount === 0 ? (
-              <span className="text-[#00C46A]">Fully Covered</span>
+              <span className="text-[#00C46A]">
+                {isSwahili ? 'Imekamilika Kamili' : 'Fully Covered'}
+              </span>
             ) : (
-              <span className="text-amber-400">{forecastSummary.understaffedDaysCount} Surge Alert{forecastSummary.understaffedDaysCount > 1 ? 's' : ''}</span>
+              <span className="text-amber-400">
+                {isSwahili
+                  ? `Tahadhari ${forecastSummary.understaffedDaysCount} za Ongezeko`
+                  : `${forecastSummary.understaffedDaysCount} Surge Alert${forecastSummary.understaffedDaysCount > 1 ? 's' : ''}`}
+              </span>
             )}
           </div>
           <div className="text-[11px] text-[#8899AA] mt-1">
-            Pool: {activeDriverPool} drivers &bull; Max {maxFleetDailyCapacity} stops/day
+            {isSwahili
+              ? `Madereva: ${activeDriverPool} • Upeo: vituo ${maxFleetDailyCapacity}/siku`
+              : `Pool: ${activeDriverPool} drivers • Max ${maxFleetDailyCapacity} stops/day`}
           </div>
         </div>
 
         {/* Fleet Utilization Rate */}
         <div className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038]">
           <div className="flex items-center justify-between text-xs text-[#8899AA]">
-            <span>Avg Fleet Utilization</span>
+            <span>{isSwahili ? 'Wastani wa Matumizi ya Meli' : 'Avg Fleet Utilization'}</span>
             <Truck className="w-4 h-4 text-purple-400" />
           </div>
           <div className="text-2xl font-bold font-mono text-white mt-1.5">
@@ -416,8 +450,8 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
           </div>
           <div className="text-[11px] text-[#8899AA] mt-1">
             {forecastSummary.fleetUtilizationAvg > 90
-              ? 'High demand: Recommend Shift B support'
-              : 'Optimal operating range (75-88%)'}
+              ? (isSwahili ? 'Mahitaji makubwa: Pendekeza msaada wa Zamu B' : 'High demand: Recommend Shift B support')
+              : (isSwahili ? 'Kiwango bora cha uendeshaji (75-88%)' : 'Optimal operating range (75-88%)')}
           </div>
         </div>
       </div>
@@ -430,15 +464,39 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <BarChart2 className="w-4 h-4 text-[#00C46A]" />
               <span>
-                {activeChartTab === 'volume' && 'Projected Delivery Volumes & Confidence Envelope'}
-                {activeChartTab === 'staffing' && 'Staff Optimization: Recommended vs Available Driver Roster'}
-                {activeChartTab === 'seasonality' && 'Empirical Day-of-Week Seasonality Decomposition'}
+                {activeChartTab === 'volume' && (
+                  isSwahili
+                    ? 'Kadirio la Wingi wa Utoaji na Masafa ya Uhakika'
+                    : 'Projected Delivery Volumes & Confidence Envelope'
+                )}
+                {activeChartTab === 'staffing' && (
+                  isSwahili
+                    ? 'Uboreshaji wa Wafanyakazi: Waliopendekezwa dhidi ya Waliopo'
+                    : 'Staff Optimization: Recommended vs Available Driver Roster'
+                )}
+                {activeChartTab === 'seasonality' && (
+                  isSwahili
+                    ? 'Uchambuzi wa Msimu wa Siku za Wiki'
+                    : 'Empirical Day-of-Week Seasonality Decomposition'
+                )}
               </span>
             </h3>
             <p className="text-xs text-[#8899AA] mt-0.5">
-              {activeChartTab === 'volume' && 'Expected deliveries with +18% peak surge confidence interval.'}
-              {activeChartTab === 'staffing' && 'Identifies scheduling deficits before the shift starts.'}
-              {activeChartTab === 'seasonality' && 'Baseline refill frequency distribution across Dar es Salaam commercial routes.'}
+              {activeChartTab === 'volume' && (
+                isSwahili
+                  ? 'Utoaji unaotarajiwa na kiwango cha uwezekano wa ongezeko la +18%.'
+                  : 'Expected deliveries with +18% peak surge confidence interval.'
+              )}
+              {activeChartTab === 'staffing' && (
+                isSwahili
+                  ? 'Inatambua upungufu wa ratiba kabla ya kuanza kwa zamu.'
+                  : 'Identifies scheduling deficits before the shift starts.'
+              )}
+              {activeChartTab === 'seasonality' && (
+                isSwahili
+                  ? 'Mgawanyo wa marudio ya uagizaji katika njia za biashara za Dar es Salaam.'
+                  : 'Baseline refill frequency distribution across Dar es Salaam commercial routes.'
+              )}
             </p>
           </div>
 
@@ -450,7 +508,7 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
                 activeChartTab === 'volume' ? 'bg-[#006B3C] text-white' : 'text-[#8899AA] hover:text-white'
               }`}
             >
-              Delivery Volume
+              {isSwahili ? 'Kiasi cha Utoaji' : 'Delivery Volume'}
             </button>
             <button
               type="button"
@@ -459,7 +517,7 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
                 activeChartTab === 'staffing' ? 'bg-[#006B3C] text-white' : 'text-[#8899AA] hover:text-white'
               }`}
             >
-              Staff Roster
+              {isSwahili ? 'Ratiba ya Wafanyakazi' : 'Staff Roster'}
             </button>
             <button
               type="button"
@@ -468,7 +526,7 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
                 activeChartTab === 'seasonality' ? 'bg-[#006B3C] text-white' : 'text-[#8899AA] hover:text-white'
               }`}
             >
-              Seasonality
+              {isSwahili ? 'Msimu wa Siku' : 'Seasonality'}
             </button>
           </div>
         </div>
@@ -668,10 +726,12 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
           <div>
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <CalendarDays className="w-4 h-4 text-[#00C46A]" />
-              <span>Optimized Daily Shift & Vehicle Roster</span>
+              <span>{isSwahili ? 'Ratiba Bora ya Zamu na Magari ya Kila Siku' : 'Optimized Daily Shift & Vehicle Roster'}</span>
             </h3>
             <p className="text-xs text-[#8899AA] mt-0.5">
-              Target workload: {targetStopsPerDriver} stops/driver/day &bull; Staggered morning/afternoon split
+              {isSwahili
+                ? `Lengo la kazi: vituo ${targetStopsPerDriver}/dereva/siku • Mgawanyo wa asubuhi na mchana`
+                : `Target workload: ${targetStopsPerDriver} stops/driver/day • Staggered morning/afternoon split`}
             </p>
           </div>
 
@@ -680,12 +740,14 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
               {forecastSummary.understaffedDaysCount > 0 ? (
                 <span className="text-amber-400 font-semibold flex items-center gap-1">
                   <AlertTriangle className="w-3.5 h-3.5" />
-                  {forecastSummary.understaffedDaysCount} shift surge requires relief staff
+                  {isSwahili
+                    ? `Ongezeko la zamu ${forecastSummary.understaffedDaysCount} linahitaji madereva wa ziada`
+                    : `${forecastSummary.understaffedDaysCount} shift surge requires relief staff`}
                 </span>
               ) : (
                 <span className="text-[#00C46A] font-semibold flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  Full shift coverage verified
+                  {isSwahili ? 'Zamu zote zimefunikwa kikamilifu' : 'Full shift coverage verified'}
                 </span>
               )}
             </span>
@@ -696,14 +758,14 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
           <table className="w-full text-xs text-left">
             <thead>
               <tr className="border-b border-[#243447] bg-[#162719] text-[#8899AA]">
-                <th className="py-3 px-3.5 font-semibold">Date & Day</th>
-                <th className="py-3 px-3 font-semibold">Forecasted Stops</th>
-                <th className="py-3 px-3 font-semibold">Bottles (18.9L)</th>
-                <th className="py-3 px-3 font-semibold">Drivers Needed</th>
-                <th className="py-3 px-3 font-semibold">Trucks</th>
-                <th className="py-3 px-3 font-semibold">Shift Split</th>
-                <th className="py-3 px-3 font-semibold">Utilization</th>
-                <th className="py-3 px-3.5 font-semibold">Dispatch Directive</th>
+                <th className="py-3 px-3.5 font-semibold">{isSwahili ? 'Tarehe na Siku' : 'Date & Day'}</th>
+                <th className="py-3 px-3 font-semibold">{isSwahili ? 'Vituo Vilivyokadiriwa' : 'Forecasted Stops'}</th>
+                <th className="py-3 px-3 font-semibold">{isSwahili ? 'Chupa (18.9L)' : 'Bottles (18.9L)'}</th>
+                <th className="py-3 px-3 font-semibold">{isSwahili ? 'Madereva Wanaohitajika' : 'Drivers Needed'}</th>
+                <th className="py-3 px-3 font-semibold">{isSwahili ? 'Magari' : 'Trucks'}</th>
+                <th className="py-3 px-3 font-semibold">{isSwahili ? 'Mgawanyo wa Zamu' : 'Shift Split'}</th>
+                <th className="py-3 px-3 font-semibold">{isSwahili ? 'Ufanisi' : 'Utilization'}</th>
+                <th className="py-3 px-3.5 font-semibold">{isSwahili ? 'Maelekezo ya Usafirishaji' : 'Dispatch Directive'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#243447]/60">
@@ -732,7 +794,7 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
 
                     {/* Bottles */}
                     <td className="py-3 px-3 whitespace-nowrap font-mono text-[#8899AA]">
-                      <strong className="text-white">{day.expectedBottles}</strong> units
+                      <strong className="text-white">{day.expectedBottles}</strong> {isSwahili ? 'chupa' : 'units'}
                     </td>
 
                     {/* Drivers Needed */}
@@ -745,7 +807,7 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
                               : 'bg-[#006B3C]/30 text-[#00C46A] border border-[#00C46A]/30'
                           }`}
                         >
-                          {day.recommendedDrivers} Drivers
+                          {day.recommendedDrivers} {isSwahili ? 'Madereva' : 'Drivers'}
                         </span>
                         {isUnderstaffed && (
                           <span className="text-[10px] text-amber-400 font-bold" title="Surge exceeds available pool">
@@ -757,17 +819,19 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
 
                     {/* Trucks */}
                     <td className="py-3 px-3 whitespace-nowrap font-mono text-white">
-                      {day.recommendedTrucks} Vehicles
+                      {day.recommendedTrucks} {isSwahili ? 'Magari' : 'Vehicles'}
                     </td>
 
                     {/* Shift Split */}
                     <td className="py-3 px-3 whitespace-nowrap">
                       <div className="text-[11px] text-white">
-                        <span>A: {day.morningShiftStops} stops</span>
+                        <span>A: {day.morningShiftStops} {isSwahili ? 'vituo' : 'stops'}</span>
                         <span className="text-[#8899AA] mx-1">&bull;</span>
                         <span className="text-[#8899AA]">B: {day.afternoonShiftStops}</span>
                       </div>
-                      <div className="text-[9px] text-[#8899AA]">07:00 vs 13:00 dispatch</div>
+                      <div className="text-[9px] text-[#8899AA]">
+                        {isSwahili ? '07:00 dhidi ya 13:00' : '07:00 vs 13:00 dispatch'}
+                      </div>
                     </td>
 
                     {/* Utilization */}
@@ -814,7 +878,7 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                <span>AI Logistics & Shift Rostering Advisory</span>
+                <span>{isSwahili ? 'Ushauri wa AI wa Upangaji Wafanyakazi na Usafirishaji' : 'AI Logistics & Shift Rostering Advisory'}</span>
                 {aiAdvice?.source === 'gemini-3.8-flash' && (
                   <span className="text-[10px] font-bold bg-purple-900/60 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/40">
                     Gemini 3.8 Flash
@@ -822,7 +886,9 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
                 )}
               </h3>
               <p className="text-xs text-[#8899AA] mt-0.5">
-                Strategic scheduling recommendations to prevent driver burnout and optimize vehicle turnover.
+                {isSwahili
+                  ? 'Mapendekezo ya kimkakati ya ratiba kuzuia uchovu wa dereva na kuboresha matumizi ya gari.'
+                  : 'Strategic scheduling recommendations to prevent driver burnout and optimize vehicle turnover.'}
               </p>
             </div>
           </div>
@@ -834,7 +900,11 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
             className="flex items-center gap-1.5 bg-[#1A2E1C] hover:bg-[#253D28] text-white border border-[#3A5068] hover:border-[#00C46A] px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-[#00C46A] ${isAiLoading ? 'animate-spin' : ''}`} />
-            <span>{isAiLoading ? 'Analyzing Roster...' : 'Re-run AI Analysis'}</span>
+            <span>
+              {isAiLoading
+                ? (isSwahili ? 'Inachambua Ratiba...' : 'Analyzing Roster...')
+                : (isSwahili ? 'Chambua Upya kwa AI' : 'Re-run AI Analysis')}
+            </span>
           </button>
         </div>
 
@@ -851,7 +921,7 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
               <div className="bg-[#1A2E1C] p-3.5 rounded-xl border border-[#3A5068]/50">
                 <div className="flex items-center gap-2 font-bold text-white mb-1.5">
                   <Clock className="w-4 h-4 text-blue-400" />
-                  <span>Shift Staggering Strategy</span>
+                  <span>{isSwahili ? 'Mbinu ya Kupishanisha Zamu' : 'Shift Staggering Strategy'}</span>
                 </div>
                 <p className="text-[#8899AA] leading-normal">{aiAdvice.shiftStaggeringPlan}</p>
               </div>
@@ -860,7 +930,7 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
               <div className="bg-[#1A2E1C] p-3.5 rounded-xl border border-[#3A5068]/50">
                 <div className="flex items-center gap-2 font-bold text-white mb-1.5">
                   <Truck className="w-4 h-4 text-[#00C46A]" />
-                  <span>Fleet & Vehicle Allocation</span>
+                  <span>{isSwahili ? 'Ugawaji wa Meli na Magari' : 'Fleet & Vehicle Allocation'}</span>
                 </div>
                 <p className="text-[#8899AA] leading-normal">{aiAdvice.fleetDeploymentAdvice}</p>
               </div>
@@ -869,7 +939,7 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
               <div className="bg-[#1A2E1C] p-3.5 rounded-xl border border-[#3A5068]/50">
                 <div className="flex items-center gap-2 font-bold text-white mb-1.5">
                   <ShieldAlert className="w-4 h-4 text-amber-400" />
-                  <span>Surge & Risk Buffering</span>
+                  <span>{isSwahili ? 'Kinga dhidi ya Ongezeko na Hatari' : 'Surge & Risk Buffering'}</span>
                 </div>
                 <p className="text-[#8899AA] leading-normal">{aiAdvice.riskMitigation}</p>
               </div>
@@ -879,7 +949,7 @@ export const DeliveryForecastOptimizer: React.FC<DeliveryForecastOptimizerProps>
             {aiAdvice.keyActionItems?.length > 0 && (
               <div className="bg-[#162719] p-3.5 rounded-xl border border-[#2A5038]">
                 <span className="text-[11px] font-bold text-white uppercase tracking-wider block mb-2">
-                  Manager Dispatch Checklist
+                  {isSwahili ? 'Orodha ya Ukaguzi ya Meneja' : 'Manager Dispatch Checklist'}
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {aiAdvice.keyActionItems.map((item, idx) => (

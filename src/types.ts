@@ -1,4 +1,4 @@
-export type UserRole = 'field_staff' | 'supervisor' | 'manager';
+export type UserRole = 'field_staff' | 'dispatcher' | 'supervisor' | 'manager';
 
 export interface UserProfile {
   id: string;
@@ -7,6 +7,8 @@ export interface UserProfile {
   phone: string;
   role: UserRole;
   employeeId: string;
+  plant?: string;
+  title?: string;
 }
 
 export interface BiometricCredential {
@@ -29,6 +31,8 @@ export interface Product {
   unit: string;
   stockAvailable: number;
   quantity?: number;
+  description?: string;
+  currency?: string;
 }
 
 export interface OrderItem {
@@ -137,4 +141,33 @@ export interface TimelineTask {
 }
 
 export type ThemeMode = 'dark' | 'sunlight';
+
+export type TeamFieldStatus = 'en_route' | 'at_customer' | 'delivering' | 'depot_reload' | 'idle' | 'offline';
+
+export interface FieldTeamLocation {
+  userId: string;
+  staffName: string;
+  employeeId: string;
+  phone?: string;
+  role: UserRole;
+  latitude: number;
+  longitude: number;
+  accuracy: number; // in meters
+  heading: number | null; // in degrees (0-360)
+  speed: number | null; // in km/h
+  altitude: number | null;
+  timestamp: string; // ISO string
+  updatedAt: number; // Unix epoch ms
+  isOnline: boolean;
+  status: TeamFieldStatus;
+  assignedRoute: string;
+  currentStop?: string;
+  batteryLevel?: number; // 0-100%
+  truckStock?: {
+    bottles18_9L: number;
+    bottles13L: number;
+  };
+  totalStopsToday?: number;
+  completedStopsToday?: number;
+}
 

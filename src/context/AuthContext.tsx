@@ -3,12 +3,56 @@ import { UserProfile, UserRole, BiometricCredential } from '../types';
 import { supabase } from '../lib/supabase';
 import { webAuthnService } from '../services/webauthn';
 
+export const MWANZA_PLANT_ROSTER: Record<'supervisor' | 'dispatcher' | 'manager' | 'field_staff', UserProfile> = {
+  supervisor: {
+    id: 'usr-noah-philemon',
+    name: 'Noah Philemon',
+    email: 'noah.philemon@zamzam.co.tz',
+    phone: '+255 768 412 001',
+    role: 'supervisor',
+    employeeId: 'ZZ-MWZ-SUP-01',
+    plant: 'Mwanza Plant',
+    title: 'Plant Operations Supervisor',
+  },
+  dispatcher: {
+    id: 'usr-grace-matiku',
+    name: 'Grace Matiku',
+    email: 'grace.matiku@zamzam.co.tz',
+    phone: '+255 754 883 219',
+    role: 'dispatcher',
+    employeeId: 'ZZ-MWZ-DISP-01',
+    plant: 'Mwanza Plant',
+    title: 'Fleet & Delivery Dispatcher',
+  },
+  manager: {
+    id: 'usr-aaliyah-salehe',
+    name: 'Aaliyah Salehe',
+    email: 'aaliyah.salehe@zamzam.co.tz',
+    phone: '+255 784 920 114',
+    role: 'manager',
+    employeeId: 'ZZ-MWZ-MGR-01',
+    plant: 'Mwanza Plant',
+    title: 'Mwanza Plant General Manager',
+  },
+  field_staff: {
+    id: 'usr-hassan-mwinyi',
+    name: 'Hassan Mwinyi',
+    email: 'hassan.mwinyi@zamzam.co.tz',
+    phone: '+255 712 345 678',
+    role: 'field_staff',
+    employeeId: 'ZZ-MWZ-FLD-01',
+    plant: 'Mwanza Plant',
+    title: 'Route Delivery Lead',
+  },
+};
+
 interface AuthContextType {
   user: UserProfile | null;
   role: UserRole;
   loading: boolean;
   error: string | null;
   isFieldStaff: boolean;
+  isDispatcher: boolean;
   isSupervisor: boolean;
   isManager: boolean;
   login: (email: string, password?: string, role?: UserRole) => Promise<{ success: boolean; error?: string }>;
@@ -17,6 +61,7 @@ interface AuthContextType {
   signUp: (name: string, email: string, phone: string, password?: string, role?: UserRole) => Promise<{ success: boolean; error?: string }>;
   setRole: (role: UserRole) => Promise<void>;
   updateProfile: (updated: Partial<UserProfile>) => Promise<void>;
+  switchMwanzaPreset: (presetKey: 'supervisor' | 'dispatcher' | 'manager' | 'field_staff') => void;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -34,13 +79,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const parsed = JSON.parse(saved);
         // Only return if valid user structure
         if (parsed && parsed.id && parsed.email) {
-          return parsed;
+          return {
+            ...parsed,
+            plant: parsed.plant || 'Mwanza Plant',
+          };
         }
       }
     } catch {
       // ignore
     }
-    return null;
+    // Default primary profile: Noah Philemon (Supervisor - Mwanza Plant)
+    return MWANZA_PLANT_ROSTER.supervisor;
   });
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -221,14 +270,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Provide offline fallback session if field staff credentials provided
         if (email.trim().length > 3) {
-          const fallbackUser: UserProfile = {
-            id: 'usr-' + btoa(email.trim()).replace(/=/g, '').slice(0, 8),
-            name: email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-            email: email.trim(),
-            phone: '+255 7' + Math.floor(10000000 + Math.random() * 90000000),
-            role: targetRole,
-            employeeId: `ZZ-${Math.floor(1000 + Math.random() * 9000)}`,
-          };
+          const lower = email.toLowerCase().trim();
+          let fallbackUser: UserProfile;
+          if (lower.includes('noah') || lower.includes('philemon')) {
+            fallbackUser = MWANZA_PLANT_ROSTER.supervisor;
+          } else if (lower.includes('grace') || lower.includes('matiku')) {
+            fallbackUser = MWANZA_PLANT_ROSTER.dispatcher;
+          } else if (lower.includes('aaliyah') || lower.includes('salehe')) {
+            fallbackUser = MWANZA_PLANT_ROSTER.manager;
+          } else {
+            fallbackUser = {
+              id: 'usr-' + btoa(email.trim()).replace(/=/g, '').slice(0, 8),
+              name: email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+              email: email.trim(),
+              phone: '+255 7' + Math.floor(10000000 + Math.random() * 90000000),
+              role: targetRole,
+              employeeId: `ZZ-MWZ-${Math.floor(1000 + Math.random() * 9000)}`,
+              plant: 'Mwanza Plant',
+            };
+          }
 
           setUser(fallbackUser);
           setLoading(false);
@@ -433,6 +493,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Fast switch to official Mwanza Plant roster members
+  const switchMwanzaPreset = (presetKey: 'supervisor' | 'dispatcher' | 'manager' | 'field_staff') => {
+    const selected = MWANZA_PLANT_ROSTER[presetKey];
+    if (selected) {
+      setUser(selected);
+      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(selected));
+    }
+  };
+
   // Sign out from Supabase Auth and clear local session
   const logout = async () => {
     try {
@@ -456,6 +525,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         error,
         isFieldStaff: role === 'field_staff',
+        isDispatcher: role === 'dispatcher' || role === 'supervisor' || role === 'manager',
         isSupervisor: role === 'supervisor' || role === 'manager',
         isManager: role === 'manager',
         login,
@@ -464,6 +534,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUp,
         setRole,
         updateProfile,
+        switchMwanzaPreset,
         logout,
         clearError,
       }}
