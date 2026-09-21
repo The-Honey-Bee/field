@@ -3,10 +3,19 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { Navbar } from './components/Navbar';
-import { Navigation } from './components/Navigation';
+import {
+  Navigation,
+  SupervisorNavigation,
+  DispatcherNavigation,
+  ManagerNavigation,
+  FieldStaffNavigation,
+} from './components/Navigation';
 import { OfflineSyncBanner } from './components/OfflineSyncBanner';
 import { OfflineSyncModal } from './components/OfflineSyncModal';
 import { HomeScreen } from './screens/HomeScreen';
+import { SupervisorHomeScreen } from './screens/SupervisorHomeScreen';
+import { DispatcherHomeScreen } from './screens/DispatcherHomeScreen';
+import { ManagerHomeScreen } from './screens/ManagerHomeScreen';
 import { OrderPaymentScreen } from './screens/OrderPaymentScreen';
 import { EodReportScreen } from './screens/EodReportScreen';
 import { SupervisorScreen } from './screens/SupervisorScreen';
@@ -19,7 +28,7 @@ import { GoogleFormsScreen } from './screens/GoogleFormsScreen';
 import { AuthScreen } from './screens/AuthScreen';
 
 const AppContent: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, role, loading } = useAuth();
   const [currentView, setCurrentView] = useState<string>('home');
   const [showSyncModal, setShowSyncModal] = useState<boolean>(false);
 
@@ -38,10 +47,40 @@ const AppContent: React.FC = () => {
     return <AuthScreen />;
   }
 
+  // Dynamic Navigation Component based on Role from AuthContext
+  const renderRoleNavigation = () => {
+    switch (role) {
+      case 'supervisor':
+        return <SupervisorNavigation currentView={currentView} onNavigate={setCurrentView} />;
+      case 'dispatcher':
+        return <DispatcherNavigation currentView={currentView} onNavigate={setCurrentView} />;
+      case 'manager':
+        return <ManagerNavigation currentView={currentView} onNavigate={setCurrentView} />;
+      case 'field_staff':
+      default:
+        return <FieldStaffNavigation currentView={currentView} onNavigate={setCurrentView} />;
+    }
+  };
+
+  // Dynamic Home Screen Component based on Role from AuthContext
+  const renderRoleHomeScreen = () => {
+    switch (role) {
+      case 'supervisor':
+        return <SupervisorHomeScreen onNavigate={setCurrentView} />;
+      case 'dispatcher':
+        return <DispatcherHomeScreen onNavigate={setCurrentView} />;
+      case 'manager':
+        return <ManagerHomeScreen onNavigate={setCurrentView} />;
+      case 'field_staff':
+      default:
+        return <HomeScreen onNavigate={setCurrentView} />;
+    }
+  };
+
   const renderCurrentView = () => {
     switch (currentView) {
       case 'home':
-        return <HomeScreen onNavigate={setCurrentView} />;
+        return renderRoleHomeScreen();
       case 'orders':
         return <OrderPaymentScreen onNavigate={setCurrentView} />;
       case 'reports':
@@ -61,7 +100,7 @@ const AppContent: React.FC = () => {
       case 'account':
         return <AccountManagementScreen onNavigate={setCurrentView} />;
       default:
-        return <HomeScreen onNavigate={setCurrentView} />;
+        return renderRoleHomeScreen();
     }
   };
 
@@ -69,7 +108,7 @@ const AppContent: React.FC = () => {
     <div className="min-h-screen bg-[#0A1A0F] text-[#D0E8F0] flex flex-col font-sans selection:bg-[#00C46A] selection:text-[#0A1A0F]">
       <Navbar currentView={currentView} onNavigate={setCurrentView} />
       <OfflineSyncBanner onOpenSyncCenter={() => setShowSyncModal(true)} />
-      <Navigation currentView={currentView} onNavigate={setCurrentView} />
+      {renderRoleNavigation()}
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         {renderCurrentView()}

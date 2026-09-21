@@ -64,6 +64,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
         return { label: 'Manager', bg: 'bg-purple-900/60 text-purple-300 border-purple-500/40' };
       case 'supervisor':
         return { label: 'Supervisor', bg: 'bg-blue-900/60 text-blue-300 border-blue-500/40' };
+      case 'dispatcher':
+        return { label: 'Dispatcher', bg: 'bg-amber-900/60 text-amber-300 border-amber-500/40' };
       default:
         return { label: 'Field Staff', bg: 'bg-[#006B3C]/40 text-[#00C46A] border-[#00C46A]/40' };
     }

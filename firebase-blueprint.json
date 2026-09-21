@@ -1,0 +1,81 @@
+{
+  "entities": {
+    "FieldLocation": {
+      "title": "FieldLocation",
+      "description": "Real-time field telemetry and truck location coordinates for Mwanza route teams",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "employeeId": { "type": "string", "maxLength": 64 },
+        "staffName": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "maxLength": 64 },
+        "assignedRoute": { "type": "string", "maxLength": 256 },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "accuracy": { "type": "number" },
+        "speed": { "type": "number" },
+        "heading": { "type": "number" },
+        "altitude": { "type": "number" },
+        "batteryLevel": { "type": "number" },
+        "isOnline": { "type": "boolean" },
+        "status": { "type": "string", "maxLength": 64 },
+        "currentStop": { "type": "string", "maxLength": 256 },
+        "truckStock": { "type": "object" },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "latitude", "longitude"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Registered commercial and retail water client profiles",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "phone": { "type": "string", "maxLength": 64 },
+        "address": { "type": "string", "maxLength": 256 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "name"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Dispatched water delivery and bottle return orders",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 128 },
+        "phone": { "type": "string", "maxLength": 64 },
+        "location": { "type": "string", "maxLength": 256 },
+        "totalAmount": { "type": "number" },
+        "paymentStatus": { "type": "string", "maxLength": 64 },
+        "orderStatus": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "customerName"]
+    }
+  },
+  "firestore": {
+    "/test/connection": {
+      "schema": "object",
+      "description": "Backend connectivity validation document"
+    },
+    "/field_locations/{userId}": {
+      "schema": "FieldLocation",
+      "description": "Live GPS coordinates and vehicle status for field teams in Mwanza"
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Client directory for Mwanza distribution routes"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Active delivery dispatches and completed sales"
+    },
+    "/admins/{userId}": {
+      "schema": "object",
+      "description": "Administrative authority roster"
+    }
+  }
+}

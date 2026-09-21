@@ -161,7 +161,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initializeAuth = async () => {
       try {
         setLoading(true);
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const sessionRes = await supabase.auth.getSession().catch(() => ({ data: { session: null }, error: null }));
+        const session = sessionRes?.data?.session;
 
         if (session?.user) {
           const profile = await syncUserProfileFromDatabase(
@@ -187,28 +188,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initializeAuth();
 
     // Listen to real-time auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const profile = await syncUserProfileFromDatabase(
-          session.user.id,
-          session.user.email,
-          session.user.user_metadata
-        );
-        if (isMounted && profile) {
-          setUser(profile);
-          localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(profile));
+    let unsubscribeAuth: (() => void) | null = null;
+    try {
+      const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          const profile = await syncUserProfileFromDatabase(
+            session.user.id,
+            session.user.email,
+            session.user.user_metadata
+          );
+          if (isMounted && profile) {
+            setUser(profile);
+            localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(profile));
+          }
+        } else if (event === 'SIGNED_OUT') {
+          if (isMounted) {
+            setUser(null);
+            localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+          }
         }
-      } else if (event === 'SIGNED_OUT') {
-        if (isMounted) {
-          setUser(null);
-          localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
-        }
-      }
-    });
+      });
+      unsubscribeAuth = () => authListener?.subscription?.unsubscribe();
+    } catch {
+      // Supabase auth subscription fallback
+    }
 
     return () => {
       isMounted = false;
-      authListener?.subscription?.unsubscribe();
+      if (unsubscribeAuth) {
+        unsubscribeAuth();
+      }
     };
   }, [syncUserProfileFromDatabase]);
 

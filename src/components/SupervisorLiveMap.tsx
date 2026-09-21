@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
+import { leafletLayer } from 'protomaps-leaflet';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import {
   geolocationService,
-  DAR_ES_SALAAM_HUBS,
+  MWANZA_HUBS,
+  isWithinMwanzaRegion,
   calculateDistanceKm,
 } from '../services/geolocation';
 import { FieldTeamLocation, TeamFieldStatus } from '../types';
@@ -32,29 +34,77 @@ import {
   ChevronRight,
   Maximize2,
   Zap,
+  Sparkles,
+  Building2,
+  Waves,
 } from 'lucide-react';
 
 interface SupervisorLiveMapProps {
   onNavigate?: (view: string) => void;
 }
 
-type TileLayerKey = 'dark' | 'streets' | 'satellite';
+// Protomaps Vector Engine Configuration
+export const PROTOMAPS_API_KEY =
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_PROTOMAPS_API_KEY) ||
+  'c67afbf0807f68f3';
 
-const TILE_SERVERS: Record<TileLayerKey, { url: string; attribution: string; name: string }> = {
-  dark: {
-    name: 'Logistics Dark',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://carto.com/">CARTO</a>, &copy; OpenStreetMap contributors',
+export const PROTOMAPS_MVT_URL = `https://api.protomaps.com/tiles/v3/{z}/{x}/{y}.mvt?key=${PROTOMAPS_API_KEY}`;
+
+// Mwanza, Tanzania Geographic Coordinates
+export const MWANZA_CENTER: [number, number] = [-2.5164, 32.9000];
+export const MWANZA_DEFAULT_ZOOM = 13;
+
+type MapThemeKey =
+  | 'protomaps_dark'
+  | 'protomaps_light'
+  | 'protomaps_grayscale'
+  | 'protomaps_white'
+  | 'carto_dark';
+
+interface MapThemeConfig {
+  id: MapThemeKey;
+  name: string;
+  isVector: boolean;
+  flavor?: string;
+  rasterUrl?: string;
+  attribution: string;
+}
+
+const MAP_THEMES: Record<MapThemeKey, MapThemeConfig> = {
+  protomaps_dark: {
+    id: 'protomaps_dark',
+    name: 'Protomaps Dark Vector',
+    isVector: true,
+    flavor: 'dark',
+    attribution: '&copy; <a href="https://protomaps.com" target="_blank" rel="noreferrer">Protomaps</a> &copy; <a href="https://openstreetmap.org" target="_blank" rel="noreferrer">OpenStreetMap</a>',
   },
-  streets: {
-    name: 'Street Map',
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; OpenStreetMap contributors',
+  protomaps_light: {
+    id: 'protomaps_light',
+    name: 'Protomaps Light Vector',
+    isVector: true,
+    flavor: 'light',
+    attribution: '&copy; <a href="https://protomaps.com" target="_blank" rel="noreferrer">Protomaps</a> &copy; <a href="https://openstreetmap.org" target="_blank" rel="noreferrer">OpenStreetMap</a>',
   },
-  satellite: {
-    name: 'Voyager Daylight',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; CARTO &copy; OpenStreetMap contributors',
+  protomaps_grayscale: {
+    id: 'protomaps_grayscale',
+    name: 'Protomaps Grayscale Vector',
+    isVector: true,
+    flavor: 'grayscale',
+    attribution: '&copy; <a href="https://protomaps.com" target="_blank" rel="noreferrer">Protomaps</a> &copy; <a href="https://openstreetmap.org" target="_blank" rel="noreferrer">OpenStreetMap</a>',
+  },
+  protomaps_white: {
+    id: 'protomaps_white',
+    name: 'Protomaps High Contrast',
+    isVector: true,
+    flavor: 'white',
+    attribution: '&copy; <a href="https://protomaps.com" target="_blank" rel="noreferrer">Protomaps</a> &copy; <a href="https://openstreetmap.org" target="_blank" rel="noreferrer">OpenStreetMap</a>',
+  },
+  carto_dark: {
+    id: 'carto_dark',
+    name: 'CARTO Raster Fallback',
+    isVector: false,
+    rasterUrl: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap contributors',
   },
 };
 
@@ -64,60 +114,96 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const activeTileLayerRef = useRef<any>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const hubsLayerRef = useRef<L.LayerGroup | null>(null);
   const routesLayerRef = useRef<L.LayerGroup | null>(null);
 
   const [fleet, setFleet] = useState<FieldTeamLocation[]>([]);
   const [selectedDriver, setSelectedDriver] = useState<FieldTeamLocation | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [currentTheme, setCurrentTheme] = useState<MapThemeKey>('protomaps_dark');
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
-  const [currentTileType, setCurrentTileType] = useState<TileLayerKey>('dark');
+  const [showHubs, setShowHubs] = useState<boolean>(true);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [isMyGpsBroadcasting, setIsMyGpsBroadcasting] = useState<boolean>(false);
   const [myGpsLocation, setMyGpsLocation] = useState<FieldTeamLocation | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [isLocatingSupervisor, setIsLocatingSupervisor] = useState<boolean>(false);
+  const [cleanFeedback, setCleanFeedback] = useState<string | null>(null);
 
-  // Initialize Leaflet Map
+  // Mount tile layer (either Protomaps Vector MVT or raster fallback)
+  const mountTileLayer = (map: L.Map, themeKey: MapThemeKey) => {
+    if (activeTileLayerRef.current) {
+      activeTileLayerRef.current.remove();
+      activeTileLayerRef.current = null;
+    }
+
+    const themeConfig = MAP_THEMES[themeKey];
+
+    if (themeConfig.isVector) {
+      try {
+        const pLayer = leafletLayer({
+          url: PROTOMAPS_MVT_URL,
+          flavor: themeConfig.flavor || 'dark',
+          attribution: themeConfig.attribution,
+          maxDataZoom: 16,
+        });
+        pLayer.addTo(map);
+        activeTileLayerRef.current = pLayer;
+      } catch (err) {
+        console.warn('Protomaps vector tile initialization error, falling back to raster:', err);
+        const fallback = L.tileLayer(MAP_THEMES.carto_dark.rasterUrl!, {
+          attribution: MAP_THEMES.carto_dark.attribution,
+          maxZoom: 19,
+          subdomains: 'abcd',
+        }).addTo(map);
+        activeTileLayerRef.current = fallback;
+      }
+    } else {
+      const rasterLayer = L.tileLayer(themeConfig.rasterUrl!, {
+        attribution: themeConfig.attribution,
+        maxZoom: 19,
+        subdomains: 'abcd',
+      }).addTo(map);
+      activeTileLayerRef.current = rasterLayer;
+    }
+  };
+
+  // Initialize Leaflet Map centered on Mwanza, Tanzania
   useEffect(() => {
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
 
-    // Default center on Dar es Salaam central logistics zone
-    const defaultCenter: [number, number] = [-6.7924, 39.2450];
     const map = L.map(mapContainerRef.current, {
-      center: defaultCenter,
-      zoom: 13,
+      center: MWANZA_CENTER,
+      zoom: MWANZA_DEFAULT_ZOOM,
       zoomControl: false,
       attributionControl: false,
+      minZoom: 10,
+      maxZoom: 18,
     });
 
-    // Custom attribution
+    // Custom attribution control bottom-right
     L.control.attribution({ position: 'bottomright', prefix: false }).addTo(map);
 
-    // Zoom controls at top right
+    // Zoom control top-right
     L.control.zoom({ position: 'topright' }).addTo(map);
 
-    // Tile Layer
-    const tileConfig = TILE_SERVERS[currentTileType];
-    const baseTile = L.tileLayer(tileConfig.url, {
-      attribution: tileConfig.attribution,
-      maxZoom: 19,
-      subdomains: 'abcd',
-    }).addTo(map);
+    // Mount initial Protomaps layer
+    mountTileLayer(map, currentTheme);
 
-    tileLayerRef.current = baseTile;
-
-    // Markers & Routes layer groups
-    const markersGroup = L.layerGroup().addTo(map);
+    // Create persistent layer groups
     const routesGroup = L.layerGroup().addTo(map);
+    const hubsGroup = L.layerGroup().addTo(map);
+    const markersGroup = L.layerGroup().addTo(map);
 
-    markersLayerRef.current = markersGroup;
     routesLayerRef.current = routesGroup;
+    hubsLayerRef.current = hubsGroup;
+    markersLayerRef.current = markersGroup;
     mapInstanceRef.current = map;
 
-    // Resize observer to ensure map canvas fits nicely
+    // Resize observer to ensure responsive map container rendering
     const resizeObserver = new ResizeObserver(() => {
       map.invalidateSize();
     });
@@ -130,20 +216,11 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
     };
   }, []);
 
-  // Change Tile Type
-  const handleTileChange = (newType: TileLayerKey) => {
-    if (!mapInstanceRef.current || !tileLayerRef.current) return;
-    setCurrentTileType(newType);
-    tileLayerRef.current.remove();
-
-    const tileConfig = TILE_SERVERS[newType];
-    const newTile = L.tileLayer(tileConfig.url, {
-      attribution: tileConfig.attribution,
-      maxZoom: 19,
-      subdomains: 'abcd',
-    }).addTo(mapInstanceRef.current);
-
-    tileLayerRef.current = newTile;
+  // Handle Layer Theme Switching
+  const handleThemeChange = (newTheme: MapThemeKey) => {
+    if (!mapInstanceRef.current) return;
+    setCurrentTheme(newTheme);
+    mountTileLayer(mapInstanceRef.current, newTheme);
   };
 
   // Subscribe to Fleet Locations
@@ -166,7 +243,109 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
     };
   }, []);
 
-  // Update Map Markers whenever fleet or filters change
+  // Render Hubs (Mwanza Regional Stations & Nyakato Bottling Plant)
+  useEffect(() => {
+    const hubsGroup = hubsLayerRef.current;
+    if (!hubsGroup) return;
+
+    hubsGroup.clearLayers();
+    if (!showHubs) return;
+
+    // 1. ZAMZAM Central Bottling Plant & Depot (Nyakato)
+    const nyakato = MWANZA_HUBS.DEPOT_NYAKATO;
+    const depotIcon = L.divIcon({
+      className: 'mwanza-depot-marker',
+      html: `
+        <div class="relative flex items-center justify-center cursor-pointer group">
+          <div class="absolute -inset-2.5 rounded-full bg-[#00C46A]/25 animate-ping"></div>
+          <div class="w-11 h-11 rounded-2xl bg-[#006B3C] border-2 border-[#00C46A] shadow-2xl flex flex-col items-center justify-center text-white transition-transform group-hover:scale-110">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+            </svg>
+          </div>
+          <div class="absolute -bottom-5 bg-[#0A1A0F]/95 text-[#00C46A] text-[9px] font-bold px-2 py-0.5 rounded-full border border-[#00C46A]/50 whitespace-nowrap shadow-lg flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#00C46A]"></span>
+            <span>NYAKATO BOTTLING DEPOT</span>
+          </div>
+        </div>
+      `,
+      iconSize: [44, 44],
+      iconAnchor: [22, 22],
+    });
+
+    const depotMarker = L.marker([nyakato.lat, nyakato.lng], {
+      icon: depotIcon,
+      zIndexOffset: 500,
+    });
+
+    depotMarker.bindPopup(`
+      <div class="text-[#0A1A0F] font-sans p-1.5 min-w-[240px]">
+        <div class="font-bold text-sm text-[#006B3C] flex items-center gap-1.5">
+          <span>${nyakato.name}</span>
+        </div>
+        <div class="text-xs text-gray-600 mt-0.5">${nyakato.address}</div>
+        <div class="mt-2 pt-2 border-t border-gray-200 space-y-1 text-[11px]">
+          <div class="flex justify-between"><strong>Role:</strong> <span class="text-gray-700">${nyakato.role}</span></div>
+          <div class="flex justify-between"><strong>Capacity:</strong> <span class="text-[#007A40] font-bold">${nyakato.capacity}</span></div>
+          <div class="flex justify-between"><strong>Region:</strong> <span class="text-gray-700">Mwanza, Lake Victoria Zone</span></div>
+          <div class="flex justify-between"><strong>Status:</strong> <span class="text-[#007A40] font-semibold">Active Dispatch</span></div>
+        </div>
+      </div>
+    `);
+    hubsGroup.addLayer(depotMarker);
+
+    // 2. Regional Mwanza Logistics Hubs (Capripoint, Posta CBD, Buzuruga, Kirumba, etc.)
+    const otherHubs = [
+      MWANZA_HUBS.CAPRIPOINT_WATERFRONT,
+      MWANZA_HUBS.POSTA_CBD,
+      MWANZA_HUBS.BUZURUGA_PLAZA,
+      MWANZA_HUBS.KIRUMBA_STADIUM,
+      MWANZA_HUBS.PASIANSI_AIRPORT,
+      MWANZA_HUBS.NYEGEZI_TERMINAL,
+      MWANZA_HUBS.IGOMA_JUNCTION,
+    ];
+
+    otherHubs.forEach((hub) => {
+      const hubIcon = L.divIcon({
+        className: 'mwanza-subhub-marker',
+        html: `
+          <div class="relative flex items-center justify-center cursor-pointer group select-none">
+            <div class="w-8 h-8 rounded-xl bg-[#1A2E1C] border border-[#00C46A]/60 shadow-lg flex items-center justify-center text-[#00C46A] group-hover:scale-110 transition-transform">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+            </div>
+            <div class="absolute -bottom-4 bg-[#0A1A0F]/90 text-gray-300 text-[8px] font-semibold px-1.5 py-0.2 rounded border border-[#243447] whitespace-nowrap shadow">
+              ${hub.shortName}
+            </div>
+          </div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+      });
+
+      const marker = L.marker([hub.lat, hub.lng], {
+        icon: hubIcon,
+        zIndexOffset: 300,
+      });
+
+      marker.bindPopup(`
+        <div class="text-[#0A1A0F] font-sans p-1 min-w-[210px]">
+          <div class="font-bold text-xs text-[#006B3C]">${hub.name}</div>
+          <div class="text-[11px] text-gray-600 mt-0.5">${hub.address}</div>
+          <div class="mt-1.5 pt-1.5 border-t border-gray-200 text-[10px] space-y-0.5 text-gray-700">
+            <div><strong>Role:</strong> ${hub.role}</div>
+            <div><strong>Buffer Capacity:</strong> ${hub.capacity}</div>
+          </div>
+        </div>
+      `);
+
+      hubsGroup.addLayer(marker);
+    });
+  }, [showHubs]);
+
+  // Render Vehicle Markers & Polylines in Mwanza
   useEffect(() => {
     const map = mapInstanceRef.current;
     const markersGroup = markersLayerRef.current;
@@ -177,52 +356,13 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
     markersGroup.clearLayers();
     routesGroup.clearLayers();
 
-    // 1. Add Central Depot Marker
-    const depotIcon = L.divIcon({
-      className: 'depot-map-marker',
-      html: `
-        <div class="relative flex items-center justify-center">
-          <div class="absolute -inset-1.5 rounded-full bg-[#00C46A]/20 animate-ping"></div>
-          <div class="w-10 h-10 rounded-2xl bg-[#006B3C] border-2 border-[#00C46A] shadow-xl flex items-center justify-center text-white">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-            </svg>
-          </div>
-          <div class="absolute -bottom-5 bg-[#0A1A0F]/90 text-[#00C46A] text-[9px] font-bold px-1.5 py-0.5 rounded border border-[#00C46A]/40 whitespace-nowrap shadow">
-            UBUNGO DEPOT
-          </div>
-        </div>
-      `,
-      iconSize: [40, 40],
-      iconAnchor: [20, 20],
-    });
-
-    const depotMarker = L.marker([DAR_ES_SALAAM_HUBS.DEPOT_UBUNGO.lat, DAR_ES_SALAAM_HUBS.DEPOT_UBUNGO.lng], {
-      icon: depotIcon,
-      zIndexOffset: 50,
-    });
-
-    depotMarker.bindPopup(`
-      <div class="text-[#0A1A0F] font-sans p-1 min-w-[200px]">
-        <div class="font-bold text-sm text-[#006B3C] flex items-center gap-1.5">
-          <span>Central Depot - Ubungo Hub</span>
-        </div>
-        <div class="text-xs text-gray-600 mt-0.5">Morogoro Road, Ubungo, Dar es Salaam</div>
-        <div class="mt-2 pt-2 border-t border-gray-200 grid grid-cols-2 gap-1 text-[11px]">
-          <div><strong>Status:</strong> Active Dispatch</div>
-          <div><strong>Stock:</strong> 550x 18.9L</div>
-        </div>
-      </div>
-    `);
-    markersGroup.addLayer(depotMarker);
-
-    // 2. Filter fleet
     const filteredFleet = fleet.filter((driver) => {
       if (statusFilter === 'all') return true;
       return driver.status === statusFilter;
     });
 
-    // 3. Add Driver Markers
+    const nyakato = MWANZA_HUBS.DEPOT_NYAKATO;
+
     filteredFleet.forEach((driver) => {
       const isSelected = selectedDriver?.userId === driver.userId;
 
@@ -246,7 +386,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
         statusBg = 'bg-[#F59E0B]';
         statusBorder = 'border-[#FBBF24]';
         ringColor = 'bg-amber-500/30';
-        statusLabel = 'Depot Reload';
+        statusLabel = 'Plant Reload';
       } else if (driver.status === 'idle' || !driver.isOnline) {
         statusBg = 'bg-[#64748B]';
         statusBorder = 'border-[#94A3B8]';
@@ -267,7 +407,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
                 : ''
             }
             <div class="w-11 h-11 rounded-2xl ${statusBg} ${statusBorder} border-2 shadow-2xl flex flex-col items-center justify-center text-white font-bold relative transition-transform group-hover:scale-110 ${
-          isSelected ? 'ring-4 ring-white' : ''
+          isSelected ? 'ring-4 ring-white shadow-emerald-500/50' : ''
         }">
               <div class="flex items-center gap-0.5">
                 <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -280,14 +420,14 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
               <!-- Directional Heading Arrow Indicator -->
               ${
                 driver.heading !== null
-                  ? `<div class="absolute -top-1.5 -right-1.5 w-4 h-4 bg-black/80 rounded-full flex items-center justify-center shadow" style="transform: rotate(${headingDeg}deg)">
+                  ? `<div class="absolute -top-1.5 -right-1.5 w-4 h-4 bg-black/85 rounded-full flex items-center justify-center shadow" style="transform: rotate(${headingDeg}deg)">
                       <div class="w-0 h-0 border-l-[3px] border-l-transparent border-r-[3px] border-r-transparent border-b-[6px] border-b-[#00C46A]"></div>
                     </div>`
                   : ''
               }
             </div>
 
-            <!-- Label Pill -->
+            <!-- Vehicle Label Pill -->
             <div class="absolute -bottom-5 left-1/2 -translate-x-1/2 bg-[#0A1A0F]/95 text-white text-[9px] font-semibold px-2 py-0.5 rounded-full border border-[#243447] whitespace-nowrap shadow-lg flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full ${statusBg}"></span>
               <span>${driver.staffName.split(' ')[0]}</span>
@@ -309,12 +449,11 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
         map.panTo([driver.latitude, driver.longitude], { animate: true });
       });
 
-      // Rich popup content
-      const distToDepot = calculateDistanceKm(
+      const distToNyakato = calculateDistanceKm(
         driver.latitude,
         driver.longitude,
-        DAR_ES_SALAAM_HUBS.DEPOT_UBUNGO.lat,
-        DAR_ES_SALAAM_HUBS.DEPOT_UBUNGO.lng
+        nyakato.lat,
+        nyakato.lng
       );
 
       const popupHtml = `
@@ -339,8 +478,8 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
 
           <div class="py-2 space-y-1 text-xs">
             <div class="flex items-center justify-between">
-              <span class="text-gray-500">Route:</span>
-              <span class="font-semibold text-gray-800">${driver.assignedRoute}</span>
+              <span class="text-gray-500">Route Corridor:</span>
+              <span class="font-semibold text-gray-800 text-right truncate max-w-[150px]">${driver.assignedRoute}</span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-gray-500">Current Stop:</span>
@@ -349,8 +488,8 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
               }</span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-gray-500">Telemetry:</span>
-              <span class="font-mono font-semibold">${speedDisplay} • ${distToDepot} km to Depot</span>
+              <span class="text-gray-500">Mwanza Telemetry:</span>
+              <span class="font-mono font-semibold">${speedDisplay} • ${distToNyakato} km to Plant</span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-gray-500">Truck Inventory:</span>
@@ -359,9 +498,9 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
               </span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-gray-500">Battery & GPS Acc:</span>
+              <span class="text-gray-500">Device Battery:</span>
               <span class="font-mono text-gray-700">
-                ${driver.batteryLevel !== undefined ? `${driver.batteryLevel}%` : 'N/A'} • ±${driver.accuracy}m
+                ${driver.batteryLevel !== undefined ? `${driver.batteryLevel}%` : 'N/A'} • ±${driver.accuracy}m GPS
               </span>
             </div>
           </div>
@@ -371,16 +510,16 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
       marker.bindPopup(popupHtml, { maxWidth: 280 });
       markersGroup.addLayer(marker);
 
-      // Add a subtle line connecting driver back to Ubungo Depot
+      // Subtle trajectory line connecting truck back to Nyakato Central Depot
       const routeLine = L.polyline(
         [
-          [DAR_ES_SALAAM_HUBS.DEPOT_UBUNGO.lat, DAR_ES_SALAAM_HUBS.DEPOT_UBUNGO.lng],
+          [nyakato.lat, nyakato.lng],
           [driver.latitude, driver.longitude],
         ],
         {
           color: isSelected ? '#00C46A' : '#3A5068',
           weight: isSelected ? 3 : 1.5,
-          opacity: isSelected ? 0.8 : 0.35,
+          opacity: isSelected ? 0.85 : 0.35,
           dashArray: isSelected ? undefined : '4, 8',
         }
       );
@@ -388,20 +527,44 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
     });
   }, [fleet, selectedDriver, statusFilter]);
 
-  // Center on entire fleet
+  // Clean & Reset to pristine Mwanza Tanzania baseline data
+  const handleCleanAndResetData = () => {
+    const cleanFleet = geolocationService.resetToCleanMwanzaData();
+    setFleet(cleanFleet);
+    setSelectedDriver(null);
+    setCleanFeedback('Telemetry synchronized: 5 Mwanza route vehicles live on Protomaps.');
+
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo(MWANZA_CENTER, MWANZA_DEFAULT_ZOOM, { duration: 1.2 });
+    }
+
+    setTimeout(() => {
+      setCleanFeedback(null);
+    }, 4500);
+  };
+
+  // Center on entire Mwanza fleet and depots
   const handleCenterOnFleet = () => {
     const map = mapInstanceRef.current;
     if (!map || fleet.length === 0) return;
 
+    const nyakato = MWANZA_HUBS.DEPOT_NYAKATO;
     const bounds = L.latLngBounds([
-      [DAR_ES_SALAAM_HUBS.DEPOT_UBUNGO.lat, DAR_ES_SALAAM_HUBS.DEPOT_UBUNGO.lng],
+      [nyakato.lat, nyakato.lng],
       ...fleet.map((d) => [d.latitude, d.longitude] as [number, number]),
     ]);
 
     map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
   };
 
-  // Center on Supervisor's Current Device Location via HTML5 Geolocation
+  // Fly to specific Mwanza sector
+  const handleFlyToSector = (lat: number, lng: number, zoom = 14) => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([lat, lng], zoom, { duration: 1.2 });
+    }
+  };
+
+  // Locate supervisor device
   const handleLocateSupervisor = async () => {
     setIsLocatingSupervisor(true);
     setGpsError(null);
@@ -412,9 +575,8 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
       const lng = pos.coords.longitude;
 
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.flyTo([lat, lng], 15, { duration: 1.5 });
+        mapInstanceRef.current.flyTo([lat, lng], 15, { duration: 1.4 });
 
-        // Add a pulsing Supervisor Pin
         const supervisorIcon = L.divIcon({
           className: 'supervisor-pulse-marker',
           html: `
@@ -438,7 +600,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
         supervisorMarker.bindPopup(`
           <div class="text-[#0A1A0F] p-1 font-sans">
             <div class="font-bold text-sm text-[#006B3C]">Supervisor Device Location</div>
-            <div class="text-xs text-gray-600 mt-0.5">Live GPS Accuracy: &plusmn;${Math.round(pos.coords.accuracy)} meters</div>
+            <div class="text-xs text-gray-600 mt-0.5">GPS Accuracy: &plusmn;${Math.round(pos.coords.accuracy)}m</div>
             <div class="text-[11px] text-gray-500 mt-1 font-mono">${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
           </div>
         `);
@@ -455,7 +617,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
     }
   };
 
-  // Toggle Fleet Simulation Mode
+  // Toggle Mwanza Corridor Simulation
   const handleToggleSimulation = () => {
     const active = geolocationService.toggleFleetSimulation();
     setIsSimulating(active);
@@ -494,7 +656,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
     }
   };
 
-  // Calculate fleet summaries
+  // Calculations
   const totalBottlesInTransit = fleet.reduce(
     (sum, d) => sum + (d.truckStock?.bottles18_9L || 0) + (d.truckStock?.bottles13L || 0),
     0
@@ -513,7 +675,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
           </div>
           <div>
             <div className="text-[11px] text-[#8899AA] uppercase tracking-wider font-semibold">
-              {isSwahili ? 'Magari Ugani' : 'Active Fleet'}
+              {isSwahili ? 'Magari ya Ziwa' : 'Mwanza Fleet'}
             </div>
             <div className="text-lg font-bold font-mono text-white">
               {fleet.filter((f) => f.isOnline).length} / {fleet.length}{' '}
@@ -528,11 +690,11 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
           </div>
           <div>
             <div className="text-[11px] text-[#8899AA] uppercase tracking-wider font-semibold">
-              {isSwahili ? 'Njia Kuu' : 'En Route / Transit'}
+              {isSwahili ? 'Njia za Usambazaji' : 'Transit Corridors'}
             </div>
             <div className="text-lg font-bold font-mono text-white">
               {activeEnRouteCount}{' '}
-              <span className="text-xs text-[#8899AA] font-normal">Trucks</span>
+              <span className="text-xs text-[#8899AA] font-normal">Active</span>
             </div>
           </div>
         </div>
@@ -543,7 +705,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
           </div>
           <div>
             <div className="text-[11px] text-[#8899AA] uppercase tracking-wider font-semibold">
-              {isSwahili ? 'Kwenye Vituo' : 'At Client Drops'}
+              {isSwahili ? 'Vituo vya Wateja' : 'Client Drops'}
             </div>
             <div className="text-lg font-bold font-mono text-white">
               {atCustomerCount}{' '}
@@ -558,7 +720,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
           </div>
           <div>
             <div className="text-[11px] text-[#8899AA] uppercase tracking-wider font-semibold">
-              {isSwahili ? 'Mizigo ya Maji' : 'Bottles in Transit'}
+              {isSwahili ? 'Maji Kwenye Magari' : 'Bottles in Transit'}
             </div>
             <div className="text-lg font-bold font-mono text-[#00C46A]">
               {totalBottlesInTransit}{' '}
@@ -568,9 +730,9 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
         </div>
       </div>
 
-      {/* Main Map Container Card */}
+      {/* Main Map Card */}
       <div className="bg-[#122010] border border-[#2A5038] rounded-3xl overflow-hidden shadow-2xl flex flex-col">
-        {/* Map Header Controls Bar */}
+        {/* Top Header & Engine Status */}
         <div className="p-3.5 sm:p-4 bg-[#142416] border-b border-[#2A5038] flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#006B3C] text-white flex items-center justify-center border border-[#00C46A]/40 shadow-sm">
@@ -579,23 +741,34 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm sm:text-base font-bold text-white tracking-wide">
-                  {isSwahili ? 'Ufuatiliaji wa Moja kwa Moja wa GPS' : 'Live Field GPS Tracking'}
+                  {isSwahili ? 'Ramani ya Moja kwa Moja ya Protomaps' : 'Protomaps Live Field Map'}
                 </h2>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#00C46A]/20 text-[#00C46A] border border-[#00C46A]/30">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#00C46A] animate-ping" />
-                  <span>Dar es Salaam</span>
+                  <span>Mwanza, Tanzania</span>
                 </span>
               </div>
-              <p className="text-[11px] text-[#8899AA]">
-                {isSwahili
-                  ? 'Uwekaji wa ramani kwa wakati halisi wa madereva, mizigo ya maji na maeneo ya wateja'
-                  : 'Real-time vehicle telemetry, delivery drop status & route navigation'}
-              </p>
+              <div className="flex items-center gap-2 text-[11px] text-[#8899AA]">
+                <span>Vector MVT &bull; Key: <strong className="font-mono text-gray-300">{PROTOMAPS_API_KEY.slice(0, 8)}...</strong></span>
+                <span>&bull;</span>
+                <span className="text-[#00C46A]">Nyakato Central Plant</span>
+              </div>
             </div>
           </div>
 
-          {/* Action Buttons */}
+          {/* Action Toolbar */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Clean Data Button */}
+            <button
+              type="button"
+              onClick={handleCleanAndResetData}
+              className="flex items-center gap-1.5 bg-emerald-950/60 hover:bg-emerald-900/80 text-[#00C46A] border border-[#00C46A]/50 hover:border-[#00C46A] px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm"
+              title="Purge legacy cache and reload clean Mwanza route baseline"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#00C46A]" />
+              <span>{isSwahili ? 'Safisha Data ya Mwanza' : 'Clean Mwanza Data'}</span>
+            </button>
+
             {/* Filter by Status */}
             <div className="flex items-center gap-1.5 bg-[#1A2E1C] border border-[#3A5068]/50 rounded-xl px-2.5 py-1.5 text-xs text-white">
               <Filter className="w-3.5 h-3.5 text-[#00C46A]" />
@@ -615,52 +788,67 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
                   {isSwahili ? 'Kwa Mteja' : 'At Customer'} ({atCustomerCount})
                 </option>
                 <option value="depot_reload" className="bg-[#122010] text-white">
-                  {isSwahili ? 'Bohari ya Kupakia' : 'Depot Reload'} ({depotReloadCount})
+                  {isSwahili ? 'Bohari ya Kupakia' : 'Plant Reload'} ({depotReloadCount})
                 </option>
               </select>
             </div>
 
-            {/* Base Layer Switcher */}
+            {/* Protomaps Theme Selector */}
             <div className="flex items-center gap-1 bg-[#1A2E1C] border border-[#3A5068]/50 rounded-xl p-0.5 text-xs">
               <button
                 type="button"
-                onClick={() => handleTileChange('dark')}
+                onClick={() => handleThemeChange('protomaps_dark')}
                 className={`px-2 py-1 rounded-lg font-medium transition-all ${
-                  currentTileType === 'dark'
+                  currentTheme === 'protomaps_dark'
                     ? 'bg-[#006B3C] text-white shadow-sm'
                     : 'text-[#8899AA] hover:text-white'
                 }`}
-                title="Logistics Dark Map"
+                title="Protomaps Dark Vector Tiles"
               >
-                {isSwahili ? 'Giza' : 'Dark'}
+                {isSwahili ? 'Giza (Vector)' : 'Dark Vector'}
               </button>
               <button
                 type="button"
-                onClick={() => handleTileChange('streets')}
+                onClick={() => handleThemeChange('protomaps_light')}
                 className={`px-2 py-1 rounded-lg font-medium transition-all ${
-                  currentTileType === 'streets'
+                  currentTheme === 'protomaps_light'
                     ? 'bg-[#006B3C] text-white shadow-sm'
                     : 'text-[#8899AA] hover:text-white'
                 }`}
-                title="Street Map"
+                title="Protomaps Light Vector Tiles"
               >
-                {isSwahili ? 'Mtaa' : 'Street'}
+                {isSwahili ? 'Mchana' : 'Light'}
               </button>
               <button
                 type="button"
-                onClick={() => handleTileChange('satellite')}
+                onClick={() => handleThemeChange('protomaps_grayscale')}
                 className={`px-2 py-1 rounded-lg font-medium transition-all ${
-                  currentTileType === 'satellite'
+                  currentTheme === 'protomaps_grayscale'
                     ? 'bg-[#006B3C] text-white shadow-sm'
                     : 'text-[#8899AA] hover:text-white'
                 }`}
-                title="Voyager Daylight Map"
+                title="Protomaps Grayscale Vector Tiles"
               >
-                {isSwahili ? 'Mchana' : 'Daylight'}
+                {isSwahili ? 'Kijivu' : 'Grayscale'}
               </button>
             </div>
 
-            {/* Locate Me (Supervisor GPS) Button */}
+            {/* Toggle Hubs */}
+            <button
+              type="button"
+              onClick={() => setShowHubs(!showHubs)}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                showHubs
+                  ? 'bg-[#006B3C]/40 text-[#00C46A] border-[#00C46A]/50'
+                  : 'bg-[#1A2E1C] text-[#8899AA] border-[#3A5068]/50'
+              }`}
+              title="Toggle regional stations and depots"
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{isSwahili ? 'Vituo' : 'Hubs'}</span>
+            </button>
+
+            {/* Locate Supervisor Device */}
             <button
               type="button"
               onClick={handleLocateSupervisor}
@@ -672,12 +860,12 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
               <span className="hidden sm:inline">{isSwahili ? 'Mahali Pangu' : 'My Location'}</span>
             </button>
 
-            {/* Center on Fleet Button */}
+            {/* Center on Fleet */}
             <button
               type="button"
               onClick={handleCenterOnFleet}
               className="flex items-center gap-1.5 bg-[#1A2E1C] hover:bg-[#253D28] text-white border border-[#3A5068]/50 hover:border-[#00C46A] px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm"
-              title="Fit map bounds to all active vehicles"
+              title="Fit map bounds to all active vehicles in Mwanza"
             >
               <Maximize2 className="w-3.5 h-3.5 text-[#00C46A]" />
               <span className="hidden sm:inline">{isSwahili ? 'Onyesha Meli' : 'Fit Fleet'}</span>
@@ -692,12 +880,12 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
                   : 'bg-[#006B3C] text-white border-[#00C46A]/50 hover:bg-[#008F50]'
               }`}
-              title="Simulate vehicle live driving along Dar es Salaam corridors"
+              title="Simulate realistic vehicle movement along Mwanza road corridors"
             >
               {isSimulating ? (
                 <>
                   <Pause className="w-3.5 h-3.5 text-amber-300" />
-                  <span>{isSwahili ? 'Uigaji Unaendelea' : 'Simulation Active'}</span>
+                  <span>{isSwahili ? 'Uigaji Unaendelea' : 'Simulating'}</span>
                 </>
               ) : (
                 <>
@@ -708,6 +896,23 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
             </button>
           </div>
         </div>
+
+        {/* Clean Data Feedback Toast */}
+        {cleanFeedback && (
+          <div className="bg-emerald-950/80 border-b border-[#00C46A]/40 p-2.5 px-4 flex items-center justify-between text-xs text-emerald-200">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-[#00C46A] shrink-0" />
+              <span className="font-semibold">{cleanFeedback}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCleanFeedback(null)}
+              className="text-emerald-300 hover:text-white text-xs font-bold"
+            >
+              &times;
+            </button>
+          </div>
+        )}
 
         {/* GPS Error Alert */}
         {gpsError && (
@@ -726,9 +931,59 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
           </div>
         )}
 
-        {/* Map Stage + Floating Sidebar Grid */}
+        {/* Mwanza Sector Quick Jump Chips */}
+        <div className="px-4 py-2 bg-[#0F1C12] border-b border-[#243447] flex items-center gap-1.5 overflow-x-auto scrollbar-none text-[11px]">
+          <span className="text-[#8899AA] font-semibold shrink-0 mr-1 flex items-center gap-1">
+            <MapPin className="w-3 h-3 text-[#00C46A]" />
+            <span>{isSwahili ? 'Njia za Mwanza:' : 'Mwanza Hubs:'}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => handleFlyToSector(MWANZA_HUBS.DEPOT_NYAKATO.lat, MWANZA_HUBS.DEPOT_NYAKATO.lng, 15)}
+            className="px-2.5 py-1 rounded-lg bg-[#182C1B] hover:bg-[#223E27] text-white border border-[#2A5038] shrink-0 transition-colors font-medium"
+          >
+            🏭 Nyakato Main Plant
+          </button>
+          <button
+            type="button"
+            onClick={() => handleFlyToSector(MWANZA_HUBS.CAPRIPOINT_WATERFRONT.lat, MWANZA_HUBS.CAPRIPOINT_WATERFRONT.lng, 15)}
+            className="px-2.5 py-1 rounded-lg bg-[#182C1B] hover:bg-[#223E27] text-white border border-[#2A5038] shrink-0 transition-colors font-medium"
+          >
+            🌊 Capripoint Waterfront
+          </button>
+          <button
+            type="button"
+            onClick={() => handleFlyToSector(MWANZA_HUBS.POSTA_CBD.lat, MWANZA_HUBS.POSTA_CBD.lng, 15)}
+            className="px-2.5 py-1 rounded-lg bg-[#182C1B] hover:bg-[#223E27] text-white border border-[#2A5038] shrink-0 transition-colors font-medium"
+          >
+            🏢 Posta & CBD
+          </button>
+          <button
+            type="button"
+            onClick={() => handleFlyToSector(MWANZA_HUBS.BUZURUGA_PLAZA.lat, MWANZA_HUBS.BUZURUGA_PLAZA.lng, 15)}
+            className="px-2.5 py-1 rounded-lg bg-[#182C1B] hover:bg-[#223E27] text-white border border-[#2A5038] shrink-0 transition-colors font-medium"
+          >
+            🏬 Buzuruga Highway Plaza
+          </button>
+          <button
+            type="button"
+            onClick={() => handleFlyToSector(MWANZA_HUBS.KIRUMBA_STADIUM.lat, MWANZA_HUBS.KIRUMBA_STADIUM.lng, 15)}
+            className="px-2.5 py-1 rounded-lg bg-[#182C1B] hover:bg-[#223E27] text-white border border-[#2A5038] shrink-0 transition-colors font-medium"
+          >
+            ⚽ Kirumba Stadium
+          </button>
+          <button
+            type="button"
+            onClick={() => handleFlyToSector(MWANZA_HUBS.NYEGEZI_TERMINAL.lat, MWANZA_HUBS.NYEGEZI_TERMINAL.lng, 15)}
+            className="px-2.5 py-1 rounded-lg bg-[#182C1B] hover:bg-[#223E27] text-white border border-[#2A5038] shrink-0 transition-colors font-medium"
+          >
+            🚌 Nyegezi Terminal
+          </button>
+        </div>
+
+        {/* Map Stage + Floating Overlays */}
         <div className="relative w-full h-[520px] sm:h-[580px] bg-[#0A1A0F]">
-          {/* Leaflet Map DOM Node */}
+          {/* Leaflet Map DOM Canvas */}
           <div ref={mapContainerRef} className="w-full h-full z-0" />
 
           {/* Floating Driver Quick-Focus List (Desktop & Tablet) */}
@@ -737,7 +992,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
               <div className="flex items-center gap-2">
                 <Truck className="w-4 h-4 text-[#00C46A]" />
                 <span className="text-xs font-bold text-white tracking-wide">
-                  {isSwahili ? 'Magari ya Meli' : 'Fleet Units'} ({fleet.length})
+                  {isSwahili ? 'Magari ya Ziwa (Mwanza)' : 'Mwanza Fleet Units'} ({fleet.length})
                 </span>
               </div>
               <span className="text-[10px] text-[#8899AA]">
@@ -755,7 +1010,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
                     onClick={() => handleSelectDriver(driver)}
                     className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between gap-2 ${
                       isSelected
-                        ? 'bg-[#006B3C]/30 border border-[#00C46A]/40'
+                        ? 'bg-[#006B3C]/30 border border-[#00C46A]/40 shadow-sm'
                         : 'hover:bg-[#162719] border border-transparent'
                     }`}
                   >
@@ -776,14 +1031,14 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
                       <div className="truncate">
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-bold text-white truncate">{driver.staffName}</span>
-                          <span className="font-mono text-[10px] text-[#8899AA]">({driver.employeeId.slice(-6)})</span>
+                          <span className="font-mono text-[10px] text-[#8899AA]">({driver.employeeId})</span>
                         </div>
                         <div className="text-[10px] text-[#8899AA] truncate">{driver.assignedRoute}</div>
                         <div className="text-[9px] text-[#00C46A] flex items-center gap-1 mt-0.5">
                           <span>
                             {driver.speed ? `${driver.speed} km/h` : (isSwahili ? 'Kimesimama' : 'Stopped')}
                           </span>
-                          <span>•</span>
+                          <span>&bull;</span>
                           <span className="truncate">
                             {driver.currentStop || (isSwahili ? 'Njiani' : 'In transit')}
                           </span>
@@ -824,10 +1079,10 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
               </div>
               <div className="text-[10px] text-[#8899AA]">
                 {isMyGpsBroadcasting && myGpsLocation
-                  ? `Lat: ${myGpsLocation.latitude.toFixed(4)} | Acc: ±${myGpsLocation.accuracy}m`
+                  ? `Mwanza Lat: ${myGpsLocation.latitude.toFixed(4)} | Acc: ±${myGpsLocation.accuracy}m`
                   : (isSwahili
-                      ? 'Washa ili kurusha mahali ulipo kwa wasimamizi'
-                      : 'Turn on to broadcast your field position to supervisors')}
+                      ? 'Washa ili kurusha mahali ulipo Mwanza kwa wasimamizi'
+                      : 'Transmit your field device coordinates to dispatch')}
               </div>
             </div>
 
@@ -862,7 +1117,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
             </div>
             <div className="flex items-center gap-1">
               <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]" />
-              <span className="text-white">{isSwahili ? 'Kupakia Bohari' : 'Depot Reload'}</span>
+              <span className="text-white">{isSwahili ? 'Bohari ya Nyakato' : 'Plant Reload'}</span>
             </div>
           </div>
         </div>
@@ -896,7 +1151,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
                   </span>
                 </div>
                 <div className="text-xs text-[#8899AA] mt-0.5">
-                  {isSwahili ? 'Njia:' : 'Route:'}{' '}
+                  {isSwahili ? 'Njia ya Mwanza:' : 'Route Corridor:'}{' '}
                   <strong className="text-white">{selectedDriver.assignedRoute}</strong> &bull;{' '}
                   {isSwahili ? 'Kituo cha Sasa:' : 'Current Stop:'}{' '}
                   <strong className="text-[#00C46A]">
@@ -910,7 +1165,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
             <div className="flex flex-wrap items-center gap-3">
               <div className="bg-[#1A2E1C] px-3 py-1.5 rounded-xl border border-[#3A5068]/40 text-center">
                 <div className="text-[10px] text-[#8899AA]">
-                  {isSwahili ? 'Mizigo ya Gari' : 'Truck Stock'}
+                  {isSwahili ? 'Mizigo ya Maji' : 'Truck Stock'}
                 </div>
                 <div className="font-mono text-xs font-bold text-white">
                   {selectedDriver.truckStock?.bottles18_9L || 0}x 18.9L | {selectedDriver.truckStock?.bottles13L || 0}x 13L
@@ -923,7 +1178,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
                 </div>
                 <div className="font-mono text-xs font-bold text-white flex items-center justify-center gap-1">
                   <Battery className="w-3.5 h-3.5 text-[#00C46A]" />
-                  <span>{selectedDriver.batteryLevel || 85}%</span>
+                  <span>{selectedDriver.batteryLevel || 88}%</span>
                 </div>
               </div>
 

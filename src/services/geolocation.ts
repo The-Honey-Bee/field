@@ -1,106 +1,144 @@
 import { FieldTeamLocation, TeamFieldStatus, UserProfile } from '../types';
-import { firestoreDb } from '../lib/firebase';
+import { firestoreDb, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, doc, setDoc, onSnapshot, getDocs } from 'firebase/firestore';
 
-// Dar es Salaam Reference Locations & Routes
-export const DAR_ES_SALAAM_HUBS = {
-  DEPOT_UBUNGO: {
-    name: 'Central Depot - Ubungo Hub',
-    lat: -6.7865,
-    lng: 39.2132,
-    address: 'Morogoro Road, Ubungo, Dar es Salaam',
+// Mwanza Tanzania Reference Hubs & Regional Logistics Stations
+export const MWANZA_HUBS = {
+  DEPOT_NYAKATO: {
+    id: 'hub-nyakato',
+    name: 'ZAMZAM Bottling Plant & Central Depot (Nyakato)',
+    shortName: 'Nyakato Main Plant',
+    lat: -2.5280,
+    lng: 32.9350,
+    address: 'Musoma Road, Nyakato Industrial Area, Mwanza',
+    role: 'Central RO Bottling & Plant Logistics',
+    capacity: '4,500x 18.9L Bottles',
   },
-  KARIAKOO: {
-    name: 'Kariakoo Commercial Sector',
-    lat: -6.8198,
-    lng: 39.2783,
-    address: 'Swahili St / Msimbazi, Kariakoo',
+  CAPRIPOINT_WATERFRONT: {
+    id: 'hub-capripoint',
+    name: 'Capripoint Waterfront & Tilapia Executive Station',
+    shortName: 'Capripoint Hub',
+    lat: -2.5140,
+    lng: 32.8925,
+    address: 'Capripoint Hill / Tilapia Bay, Lake Victoria, Mwanza',
+    role: 'Corporate, Diplomatic & Hotel Distribution',
+    capacity: '800x 18.9L Bottles',
   },
   POSTA_CBD: {
-    name: 'Posta / CBD Tower Center',
-    lat: -6.8145,
-    lng: 39.2890,
-    address: 'Samora Avenue / Sokoine Dr',
+    id: 'hub-posta-cbd',
+    name: 'Posta & Mwanza Central Business District Hub',
+    shortName: 'CBD Posta Station',
+    lat: -2.5175,
+    lng: 32.9015,
+    address: 'Nyerere Road / Posta St, Mwanza CBD',
+    role: 'Financial Sector & Commercial Offices Refills',
+    capacity: '1,200x 18.9L Bottles',
   },
-  MASAKI: {
-    name: 'Masaki & Oysterbay Corporate',
-    lat: -6.7580,
-    lng: 39.2720,
-    address: 'Haile Selassie Rd / Toure Dr, Masaki',
+  BUZURUGA_PLAZA: {
+    id: 'hub-buzuruga',
+    name: 'Buzuruga Commercial Plaza & Highway Terminal',
+    shortName: 'Buzuruga Terminal',
+    lat: -2.5315,
+    lng: 32.9465,
+    address: 'Musoma Highway, Buzuruga, Mwanza',
+    role: 'High-Volume Wholesale & Retail Drop Station',
+    capacity: '1,500x 18.9L Bottles',
   },
-  MIKOCHENI: {
-    name: 'Mikocheni Light Industrial',
-    lat: -6.7720,
-    lng: 39.2450,
-    address: 'Old Bagamoyo Rd, Mikocheni',
+  KIRUMBA_STADIUM: {
+    id: 'hub-kirumba',
+    name: 'Kirumba & CCM Kirumba Stadium Sector',
+    shortName: 'Kirumba Hub',
+    lat: -2.5025,
+    lng: 32.8965,
+    address: 'Makongoro Road, Kirumba, Mwanza',
+    role: 'Residential & Institutional Distribution',
+    capacity: '950x 18.9L Bottles',
   },
-  SINZA: {
-    name: 'Sinza Commercial Corridor',
-    lat: -6.7810,
-    lng: 39.2290,
-    address: 'Shekilango Rd, Sinza',
+  PASIANSI_AIRPORT: {
+    id: 'hub-pasiansi',
+    name: 'Pasiansi & Mwanza Airport Logistics Stop',
+    shortName: 'Pasiansi / Airport Hub',
+    lat: -2.4825,
+    lng: 32.9155,
+    address: 'Airport Road, Pasiansi, Mwanza',
+    role: 'Airport Corridor & Northern Suburbs',
+    capacity: '700x 18.9L Bottles',
   },
-  MWENGE: {
-    name: 'Mwenge Commercial & Lorry Park',
-    lat: -6.7690,
-    lng: 39.2220,
-    address: 'Sam Nujoma Rd, Mwenge',
+  NYEGEZI_TERMINAL: {
+    id: 'hub-nyegezi',
+    name: 'Nyegezi Transit Hub & Butimba Terminal',
+    shortName: 'Nyegezi Terminal',
+    lat: -2.5665,
+    lng: 32.8975,
+    address: 'Shinyanga Road, Nyegezi, Mwanza',
+    role: 'Southern Mwanza Transit & College Corridor',
+    capacity: '1,100x 18.9L Bottles',
   },
-  MLIMANI: {
-    name: 'Mlimani City Mall',
-    lat: -6.7712,
-    lng: 39.2185,
-    address: 'Sam Nujoma Rd, Survey',
+  IGOMA_JUNCTION: {
+    id: 'hub-igoma',
+    name: 'Igoma Commercial Market Station',
+    shortName: 'Igoma Hub',
+    lat: -2.5455,
+    lng: 32.9810,
+    address: 'Musoma Road, Igoma, Mwanza',
+    role: 'Eastern Mwanza Outskirts Distribution',
+    capacity: '650x 18.9L Bottles',
   },
 };
 
-// Standard baseline fleet of field delivery vehicles in Dar es Salaam
+// Backward-compatible alias for any legacy imports
+export const DAR_ES_SALAAM_HUBS = {
+  DEPOT_UBUNGO: MWANZA_HUBS.DEPOT_NYAKATO,
+  ...MWANZA_HUBS,
+};
+
+// Clean baseline fleet in Mwanza, Tanzania (Lake Zone Corridor)
 export const INITIAL_FLEET: FieldTeamLocation[] = [
   {
     userId: 'drv-001',
-    staffName: 'Hassan Mwinyi',
-    employeeId: 'ZZ-TRK-01',
-    phone: '+255 754 112 301',
+    staffName: 'Salim Bakari',
+    employeeId: 'T 412 DZZ',
+    phone: '+255 754 882 101',
     role: 'field_staff',
-    latitude: -6.8198,
-    longitude: 39.2783,
-    accuracy: 4.8,
-    heading: 95,
+    latitude: -2.5315,
+    longitude: 32.9420,
+    accuracy: 4.2,
+    heading: 75,
     speed: 28,
-    altitude: 24,
+    altitude: 1140,
     timestamp: new Date().toISOString(),
     updatedAt: Date.now() - 1000 * 25,
     isOnline: true,
     status: 'en_route',
-    assignedRoute: 'Kariakoo Commercial Corridor',
-    currentStop: 'City Hypermarket - Swahili St',
-    batteryLevel: 88,
+    assignedRoute: 'Nyakato & Buzuruga Industrial Corridor',
+    currentStop: 'Buzuruga Commercial Plaza & Bus Terminal',
+    batteryLevel: 91,
     truckStock: {
-      bottles18_9L: 22,
-      bottles13L: 10,
+      bottles18_9L: 26,
+      bottles13L: 12,
     },
-    totalStopsToday: 14,
+    totalStopsToday: 15,
     completedStopsToday: 9,
   },
   {
     userId: 'drv-002',
-    staffName: 'Bakari Juma',
-    employeeId: 'ZZ-TRK-02',
-    phone: '+255 784 990 412',
+    staffName: 'Juma Ramadhani',
+    employeeId: 'T 834 EZZ',
+    phone: '+255 784 331 490',
     role: 'field_staff',
-    latitude: -6.7580,
-    longitude: 39.2720,
-    accuracy: 3.2,
-    heading: 140,
-    speed: 36,
-    altitude: 18,
+    latitude: -2.5145,
+    longitude: 32.8960,
+    accuracy: 3.1,
+    heading: 180,
+    speed: 0,
+    altitude: 1135,
     timestamp: new Date().toISOString(),
     updatedAt: Date.now() - 1000 * 15,
     isOnline: true,
     status: 'at_customer',
-    assignedRoute: 'Masaki & Oysterbay Diplomatic',
-    currentStop: 'Hotel Sea Cliff Receiving Dock',
-    batteryLevel: 94,
+    assignedRoute: 'Capripoint Waterfront & CBD Hub',
+    currentStop: 'Tilapia Hotel Lakeview Receiving Dock',
+    batteryLevel: 95,
     truckStock: {
       bottles18_9L: 34,
       bottles13L: 16,
@@ -110,61 +148,92 @@ export const INITIAL_FLEET: FieldTeamLocation[] = [
   },
   {
     userId: 'drv-003',
-    staffName: 'Juma Khamis',
-    employeeId: 'ZZ-TRK-03',
-    phone: '+255 713 552 890',
+    staffName: 'Baraka Mushi',
+    employeeId: 'T 119 CZZ',
+    phone: '+255 713 774 219',
     role: 'field_staff',
-    latitude: -6.7865,
-    longitude: 39.2132,
-    accuracy: 5.1,
-    heading: 270,
-    speed: 0,
-    altitude: 55,
+    latitude: -2.4920,
+    longitude: 32.9080,
+    accuracy: 5.0,
+    heading: 340,
+    speed: 22,
+    altitude: 1145,
     timestamp: new Date().toISOString(),
     updatedAt: Date.now() - 1000 * 45,
     isOnline: true,
-    status: 'depot_reload',
-    assignedRoute: 'Ubungo & Morogoro Rd Corridor',
-    currentStop: 'Central Depot Bay #2 (Reloading)',
-    batteryLevel: 62,
-    truckStock: {
-      bottles18_9L: 45,
-      bottles13L: 20,
-    },
-    totalStopsToday: 16,
-    completedStopsToday: 11,
-  },
-  {
-    userId: 'drv-004',
-    staffName: 'Amina Said',
-    employeeId: 'ZZ-TRK-04',
-    phone: '+255 765 881 234',
-    role: 'field_staff',
-    latitude: -6.7720,
-    longitude: 39.2450,
-    accuracy: 6.0,
-    heading: 45,
-    speed: 22,
-    altitude: 30,
-    timestamp: new Date().toISOString(),
-    updatedAt: Date.now() - 1000 * 60,
-    isOnline: true,
     status: 'delivering',
-    assignedRoute: 'Mikocheni & Bagamoyo Rd Corridor',
-    currentStop: 'Al-Barakah Restaurant & Catering',
-    batteryLevel: 79,
+    assignedRoute: 'Kirumba, Airport Rd & Pasiansi Corridor',
+    currentStop: 'Pasiansi Executive Suites & Clinic',
+    batteryLevel: 84,
     truckStock: {
       bottles18_9L: 18,
       bottles13L: 8,
     },
-    totalStopsToday: 10,
+    totalStopsToday: 11,
     completedStopsToday: 6,
+  },
+  {
+    userId: 'drv-004',
+    staffName: 'Ali Hassan',
+    employeeId: 'T 602 AZZ',
+    phone: '+255 765 220 541',
+    role: 'field_staff',
+    latitude: -2.5580,
+    longitude: 32.9020,
+    accuracy: 4.8,
+    heading: 195,
+    speed: 34,
+    altitude: 1150,
+    timestamp: new Date().toISOString(),
+    updatedAt: Date.now() - 1000 * 60,
+    isOnline: true,
+    status: 'en_route',
+    assignedRoute: 'Nyegezi, Butimba & Mabatini Corridor',
+    currentStop: 'Nyegezi Intercity Terminal Stores',
+    batteryLevel: 78,
+    truckStock: {
+      bottles18_9L: 42,
+      bottles13L: 18,
+    },
+    totalStopsToday: 14,
+    completedStopsToday: 8,
+  },
+  {
+    userId: 'drv-005',
+    staffName: 'Hassan Mwinyi',
+    employeeId: 'ZZ-MWZ-05',
+    phone: '+255 754 112 301',
+    role: 'field_staff',
+    latitude: -2.5180,
+    longitude: 32.9040,
+    accuracy: 3.5,
+    heading: 90,
+    speed: 0,
+    altitude: 1138,
+    timestamp: new Date().toISOString(),
+    updatedAt: Date.now() - 1000 * 30,
+    isOnline: true,
+    status: 'at_customer',
+    assignedRoute: 'Mwanza Central Express & Urgent Refills',
+    currentStop: 'Posta Bank Mwanza Main Branch',
+    batteryLevel: 88,
+    truckStock: {
+      bottles18_9L: 14,
+      bottles13L: 6,
+    },
+    totalStopsToday: 16,
+    completedStopsToday: 12,
   },
 ];
 
-const LOCAL_STORAGE_KEY = 'zamzam_field_locations';
-const MY_LOCATION_STORAGE_KEY = 'zamzam_my_live_location';
+const LOCAL_STORAGE_KEY = 'zamzam_field_locations_mwanza_clean_v1';
+const MY_LOCATION_STORAGE_KEY = 'zamzam_my_live_location_mwanza';
 const TRACKING_STATE_KEY = 'zamzam_is_tracking_active';
+
+// Helper to verify that a coordinate set is genuinely within Mwanza, Tanzania
+export function isWithinMwanzaRegion(lat: number, lng: number): boolean {
+  return lat >= -2.75 && lat <= -2.35 && lng >= 32.70 && lng <= 33.15;
+}
 
 // Haversine formula to compute distance in km
 export function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -218,22 +287,70 @@ class GeolocationTrackingService {
 
   private loadFromStorage() {
     try {
+      // Clean up legacy Dar es Salaam storage keys
+      localStorage.removeItem('zamzam_field_locations');
+      localStorage.removeItem('zamzam_my_live_location');
+
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+      let isValidMwanza = false;
       if (stored) {
         const parsed: FieldTeamLocation[] = JSON.parse(stored);
-        parsed.forEach((item) => this.cachedLocations.set(item.userId, item));
-      } else {
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Verify that cached locations are strictly within Mwanza, Tanzania
+          isValidMwanza = parsed.every((item) => isWithinMwanzaRegion(item.latitude, item.longitude));
+          if (isValidMwanza) {
+            parsed.forEach((item) => this.cachedLocations.set(item.userId, item));
+          }
+        }
+      }
+
+      if (!isValidMwanza) {
+        this.cachedLocations.clear();
         INITIAL_FLEET.forEach((item) => this.cachedLocations.set(item.userId, item));
         this.saveToStorage();
       }
 
       const storedMy = localStorage.getItem(MY_LOCATION_STORAGE_KEY);
       if (storedMy) {
-        this.myCurrentLocation = JSON.parse(storedMy);
+        const parsedMy = JSON.parse(storedMy);
+        if (parsedMy && isWithinMwanzaRegion(parsedMy.latitude, parsedMy.longitude)) {
+          this.myCurrentLocation = parsedMy;
+        } else {
+          this.myCurrentLocation = null;
+        }
       }
     } catch {
       INITIAL_FLEET.forEach((item) => this.cachedLocations.set(item.userId, item));
     }
+  }
+
+  // Explicit Clean & Reset to pristine Mwanza Tanzania baseline data
+  public resetToCleanMwanzaData(): FieldTeamLocation[] {
+    try {
+      localStorage.removeItem('zamzam_field_locations');
+      localStorage.removeItem('zamzam_my_live_location');
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      localStorage.removeItem(MY_LOCATION_STORAGE_KEY);
+    } catch {}
+
+    this.cachedLocations.clear();
+    INITIAL_FLEET.forEach((item) =>
+      this.cachedLocations.set(item.userId, {
+        ...item,
+        updatedAt: Date.now(),
+        timestamp: new Date().toISOString(),
+      })
+    );
+    this.saveToStorage();
+    this.notifyListeners();
+    this.channel?.postMessage({ type: 'ALL_LOCATIONS', payload: Array.from(this.cachedLocations.values()) });
+
+    // Sync to backend reset endpoint
+    try {
+      fetch('/api/field-locations/reset-mwanza', { method: 'POST' }).catch(() => {});
+    } catch {}
+
+    return Array.from(this.cachedLocations.values());
   }
 
   private saveToStorage() {
@@ -418,8 +535,8 @@ class GeolocationTrackingService {
         const docRef = doc(firestoreDb, 'field_locations', location.userId);
         await setDoc(docRef, { ...location }, { merge: true });
       }
-    } catch {
-      // Offline fallback
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `field_locations/${location.userId}`);
     }
   }
 
@@ -451,13 +568,13 @@ class GeolocationTrackingService {
             this.saveToStorage();
             this.notifyListeners();
           },
-          () => {
-            // Fallback to local
+          (err) => {
+            handleFirestoreError(err, OperationType.LIST, 'field_locations');
           }
         );
       }
-    } catch {
-      // Offline fallback
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'field_locations');
     }
 
     // Server-side polling fallback (every 8 seconds)
@@ -530,7 +647,7 @@ class GeolocationTrackingService {
     this.syncLocationToCloud(updated);
   }
 
-  // Simulation mode: moves the fleet through Dar es Salaam roads
+  // Simulation mode: moves the fleet through Mwanza, Tanzania road networks
   public toggleFleetSimulation(enable?: boolean): boolean {
     const targetState = enable !== undefined ? enable : !this.isSimulationRunning;
     this.isSimulationRunning = targetState;
@@ -541,7 +658,7 @@ class GeolocationTrackingService {
     }
 
     if (this.isSimulationRunning) {
-      // Slight delta movement per step (0.0003 deg is ~33 meters)
+      // Delta movement along Mwanza road corridors
       let step = 0;
       this.simulationInterval = setInterval(() => {
         step++;
@@ -553,15 +670,27 @@ class GeolocationTrackingService {
             return;
           }
 
-          // Generate realistic micro-movement along route corridors
-          const latJitter = Math.sin(step * 0.2 + driver.userId.charCodeAt(driver.userId.length - 1)) * 0.0004;
-          const lngJitter = Math.cos(step * 0.2 + driver.userId.charCodeAt(driver.userId.length - 1)) * 0.0004;
-          
-          const newLat = driver.latitude + latJitter;
-          const newLng = driver.longitude + lngJitter;
-          const currentSpeed = driver.status === 'at_customer' || driver.status === 'depot_reload'
-            ? 0
-            : Math.max(15, Math.min(48, (driver.speed || 25) + Math.round((Math.random() - 0.5) * 6)));
+          // Generate realistic micro-movement along Mwanza corridors
+          const latJitter = Math.sin(step * 0.15 + driver.userId.charCodeAt(driver.userId.length - 1)) * 0.00035;
+          const lngJitter = Math.cos(step * 0.15 + driver.userId.charCodeAt(driver.userId.length - 1)) * 0.00035;
+
+          // Keep strictly inside Mwanza road perimeter
+          let newLat = driver.latitude + latJitter;
+          let newLng = driver.longitude + lngJitter;
+
+          if (!isWithinMwanzaRegion(newLat, newLng)) {
+            // Re-anchor to Mwanza initial position if drift exceeds bounds
+            const initial = INITIAL_FLEET.find((f) => f.userId === driver.userId);
+            if (initial) {
+              newLat = initial.latitude;
+              newLng = initial.longitude;
+            }
+          }
+
+          const currentSpeed =
+            driver.status === 'at_customer' || driver.status === 'depot_reload'
+              ? 0
+              : Math.max(15, Math.min(48, (driver.speed || 25) + Math.round((Math.random() - 0.5) * 6)));
 
           const updated: FieldTeamLocation = {
             ...driver,

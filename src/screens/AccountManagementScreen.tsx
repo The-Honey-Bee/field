@@ -38,7 +38,7 @@ interface AccountManagementScreenProps {
 }
 
 export const AccountManagementScreen: React.FC<AccountManagementScreenProps> = ({ onNavigate }) => {
-  const { user, role, setRole, updateProfile, registerBiometrics, logout } = useAuth();
+  const { user, role, setRole, switchMwanzaPreset, updateProfile, registerBiometrics, logout } = useAuth();
   const { language, setLanguage, isSwahili } = useLanguage();
   const [name, setName] = useState<string>(user?.name || '');
   const [email, setEmail] = useState<string>(user?.email || '');
@@ -343,11 +343,73 @@ export const AccountManagementScreen: React.FC<AccountManagementScreenProps> = (
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {(['field_staff', 'supervisor', 'manager'] as UserRole[]).map((r) => {
+        {/* Mwanza Plant Roster Direct Switcher */}
+        <div className="bg-[#18281B] p-3.5 rounded-xl border border-[#2A5038] space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-white flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#00C46A]" />
+              {isSwahili ? 'Wafanyakazi wa Kiwanda cha Mwanza' : 'Mwanza Plant Staff Roster'}
+            </span>
+            <span className="text-[10px] text-[#8899AA] font-mono">Real Plant Team</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button
+              type="button"
+              onClick={() => switchMwanzaPreset('supervisor')}
+              className={`p-2 rounded-lg border text-left text-xs transition ${
+                role === 'supervisor'
+                  ? 'bg-blue-900/40 border-blue-500 text-white font-bold'
+                  : 'bg-[#122010] border-[#243447] text-[#8899AA] hover:text-white'
+              }`}
+            >
+              <div className="text-[11px] font-bold text-blue-300">Noah Philemon</div>
+              <div className="text-[9px] text-[#8899AA] uppercase font-semibold">Supervisor</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMwanzaPreset('dispatcher')}
+              className={`p-2 rounded-lg border text-left text-xs transition ${
+                role === 'dispatcher'
+                  ? 'bg-amber-900/40 border-amber-500 text-white font-bold'
+                  : 'bg-[#122010] border-[#243447] text-[#8899AA] hover:text-white'
+              }`}
+            >
+              <div className="text-[11px] font-bold text-amber-300">Grace Matiku</div>
+              <div className="text-[9px] text-[#8899AA] uppercase font-semibold">Dispatcher</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMwanzaPreset('manager')}
+              className={`p-2 rounded-lg border text-left text-xs transition ${
+                role === 'manager'
+                  ? 'bg-purple-900/40 border-purple-500 text-white font-bold'
+                  : 'bg-[#122010] border-[#243447] text-[#8899AA] hover:text-white'
+              }`}
+            >
+              <div className="text-[11px] font-bold text-purple-300">Aaliyah Salehe</div>
+              <div className="text-[9px] text-[#8899AA] uppercase font-semibold">Manager</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMwanzaPreset('field_staff')}
+              className={`p-2 rounded-lg border text-left text-xs transition ${
+                role === 'field_staff'
+                  ? 'bg-[#006B3C]/40 border-[#00C46A] text-white font-bold'
+                  : 'bg-[#122010] border-[#243447] text-[#8899AA] hover:text-white'
+              }`}
+            >
+              <div className="text-[11px] font-bold text-[#00C46A]">Hassan Mwinyi</div>
+              <div className="text-[9px] text-[#8899AA] uppercase font-semibold">Field Staff</div>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          {(['field_staff', 'dispatcher', 'supervisor', 'manager'] as UserRole[]).map((r) => {
             const isActive = role === r;
             const labels = {
               field_staff: { title: isSwahili ? 'Mfanyakazi wa Nyanjani' : 'Field Staff', desc: isSwahili ? 'Mauzo na usambazaji' : 'Deliveries, POS & EOD' },
+              dispatcher: { title: isSwahili ? 'Mratibu wa Usambazaji' : 'Dispatcher', desc: isSwahili ? 'Bodi ya magari na njia' : 'Fleet Board & Dispatch' },
               supervisor: { title: isSwahili ? 'Msimamizi wa Eneo' : 'Supervisor', desc: isSwahili ? 'Idhini ya maagizo na timu' : 'Approvals & Live Map' },
               manager: { title: isSwahili ? 'Meneja wa Uendeshaji' : 'Manager', desc: isSwahili ? 'Takwimu kamili na stoo' : 'Full Analytics & Control' },
             };

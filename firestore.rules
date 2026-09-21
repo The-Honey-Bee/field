@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default-deny catch-all (Phase 4 Security Rule)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == "beebee.exttreme@gmail.com" ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // Backend connectivity validation document
+    match /test/connection {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Live GPS telemetry & fleet tracking across Mwanza routes
+    match /field_locations/{userId} {
+      allow read: if true;
+      allow create, update: if isValidId(userId);
+      allow delete: if isAdmin();
+    }
+
+    // Customer client accounts
+    match /customers/{customerId} {
+      allow read: if true;
+      allow create, update: if isValidId(customerId);
+      allow delete: if isAdmin();
+    }
+
+    // Water delivery dispatches and orders
+    match /orders/{orderId} {
+      allow read: if true;
+      allow create, update: if isValidId(orderId);
+      allow delete: if isAdmin();
+    }
+
+    // Admin authorization roster
+    match /admins/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

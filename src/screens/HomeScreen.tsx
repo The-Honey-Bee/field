@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { storageService } from '../services/storage';
 import { TimelineTask, Order } from '../types';
 import { DeliveryCompletionDashboard } from '../components/DeliveryCompletionDashboard';
+import { ProtomapsLiveMap } from '../components/ProtomapsLiveMap';
 import {
   Sparkles,
   TrendingUp,
@@ -401,6 +402,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           </button>
         </div>
       </div>
+
+      {/* Protomaps Live Operations Map (Mwanza, Tanzania) */}
+      <ProtomapsLiveMap onNavigate={onNavigate} />
 
       {/* 3. Recharts Active User Today's Delivery Completion Dashboard */}
       <DeliveryCompletionDashboard

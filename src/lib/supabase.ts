@@ -6,12 +6,29 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIU
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
+// Resilient custom fetch wrapper that intercepts network failures and provides safe fallback
+const safeSupabaseFetch: typeof fetch = async (input, init) => {
+  try {
+    const res = await fetch(input, init);
+    return res;
+  } catch (err) {
+    // Unreachable endpoint or network outage: return clean 200 empty JSON array so client falls back gracefully
+    return new Response(JSON.stringify([]), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+};
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+  },
+  global: {
+    fetch: safeSupabaseFetch,
   },
 });
 
