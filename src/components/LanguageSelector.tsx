@@ -28,22 +28,22 @@ export const LanguageSelector: React.FC = () => {
   const currentTitle = language === 'sw' ? 'Kiswahili (Tanzania)' : 'English (United Kingdom)';
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className="relative shrink-0" ref={containerRef}>
       {/* Targeted Button: Language Selection Button (EN, SW) */}
       <button
         type="button"
         id="btn-language-selector"
         onClick={() => setIsOpen(!isOpen)}
         title={`Language: ${currentTitle}. Click to switch.`}
-        className="flex items-center gap-1.5 bg-[#122010] hover:bg-[#1A2E1C] border border-[#3A5068] hover:border-[#00C46A] px-2.5 py-1.5 rounded-lg text-xs font-bold text-white transition-all shadow-xs"
+        className="flex items-center gap-1.5 bg-[#122010] hover:bg-[#1A2E1C] border border-[#3A5068] hover:border-[#00C46A] px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-bold text-white transition-all shadow-xs shrink-0 whitespace-nowrap"
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
-        <span className="flex items-center gap-1.5">
+        <span className="flex items-center gap-1.5 shrink-0">
           {currentFlag}
-          <span className="tracking-wide font-mono text-[11px] sm:text-xs">{currentCode}</span>
+          <span className="tracking-wide font-mono text-[11px] sm:text-xs shrink-0">{currentCode}</span>
         </span>
-        <ChevronDown className={`w-3 h-3 text-[#8899AA] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-3 h-3 text-[#8899AA] transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Language Selection Dropdown Menu */}

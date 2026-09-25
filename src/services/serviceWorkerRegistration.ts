@@ -18,6 +18,16 @@ export function registerServiceWorker(onUpdateAvailable?: () => void): void {
     return;
   }
 
+  // In development mode, unregister any active service worker to prevent request interception and 'Failed to fetch' errors
+  if (import.meta.env.DEV) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const reg of registrations) {
+        reg.unregister();
+      }
+    }).catch(() => {});
+    return;
+  }
+
   if (onUpdateAvailable) {
     updateListeners.push(onUpdateAvailable);
   }

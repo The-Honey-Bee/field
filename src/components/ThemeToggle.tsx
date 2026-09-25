@@ -129,29 +129,29 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
           ? 'Sunlight Mode Active (Click for Low-Light Dark Mode)'
           : 'Dark Mode Active (Click for High-Contrast Outdoor Sunlight Mode)'
       }
-      className={`relative group flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold border transition-all active:scale-95 ${
+      className={`relative group flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold border transition-all active:scale-95 shrink-0 whitespace-nowrap ${
         isSunlight
           ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 shadow-sm'
           : 'bg-[#122010] hover:bg-[#1A2E1C] border-[#3A5068] text-[#8899AA] hover:text-[#00C46A]'
       } ${className}`}
     >
-      <div className="relative">
+      <div className="relative shrink-0 flex items-center justify-center">
         {isSunlight ? (
-          <Sun className="w-3.5 h-3.5 text-amber-600 animate-in spin-in-90 duration-300" />
+          <Sun className="w-3.5 h-3.5 text-amber-600 animate-in spin-in-90 duration-300 shrink-0" />
         ) : (
-          <Moon className="w-3.5 h-3.5 text-[#00C46A] animate-in spin-in-90 duration-300" />
+          <Moon className="w-3.5 h-3.5 text-[#00C46A] animate-in spin-in-90 duration-300 shrink-0" />
         )}
       </div>
 
       {showLabel && (
-        <span className="hidden sm:inline text-xs font-medium">
+        <span className="hidden lg:inline text-xs font-medium whitespace-nowrap">
           {isSunlight ? 'Sunlight Mode' : 'Dark Mode'}
         </span>
       )}
 
       {/* Screen Glare Indicator Dot */}
       <span
-        className={`w-2 h-2 rounded-full ${
+        className={`w-2 h-2 rounded-full shrink-0 ${
           isSunlight ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]' : 'bg-[#00C46A]/80'
         }`}
       />

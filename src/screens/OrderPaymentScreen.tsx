@@ -339,9 +339,9 @@ export const OrderPaymentScreen: React.FC<OrderPaymentScreenProps> = ({ onNaviga
                       </p>
                     )}
                     <div className="text-xs text-[#8899AA] mt-1.5 flex flex-wrap items-center gap-2.5">
-                      <span className="font-mono text-white font-semibold">
+                      <span className="font-mono font-bold text-sm text-[#00E57B] bg-[#006B3C]/20 border border-[#00C46A]/30 px-2 py-0.5 rounded-lg inline-flex items-center gap-1 shadow-sm">
                         TZS {product.price.toLocaleString()}{' '}
-                        <span className="text-[#8899AA] font-normal">/ {product.unit}</span>
+                        <span className="text-[#8899AA] font-normal text-xs">/ {product.unit}</span>
                       </span>
                       <span className="text-[#3A5068]">&bull;</span>
                       <span>

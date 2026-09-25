@@ -98,9 +98,22 @@ export interface Customer {
   name: string;
   phone: string;
   address?: string;
+  notes?: string;
   createdBy?: string;
   createdAt: string;
   syncStatus?: 'synced' | 'pending' | 'failed';
+}
+
+export interface CustomerSyncLogEntry {
+  id: string;
+  timestamp: string;
+  tableName: string; // 'customers'
+  direction: 'FROM_SUPABASE' | 'TO_SUPABASE';
+  action: 'FETCH' | 'INSERT' | 'SYNC';
+  status: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
+  message: string;
+  count?: number;
+  data?: any;
 }
 
 export interface ChatMessage {
@@ -113,6 +126,10 @@ export interface ChatMessage {
   createdAt: string;
   isRead: boolean;
   syncStatus: 'sent' | 'pending' | 'failed';
+  messageType?: 'text' | 'voice';
+  audioUrl?: string; // base64 Data URL or audio URI
+  audioDuration?: number; // duration in seconds
+  voiceCategory?: 'status' | 'delay' | 'arrival' | 'refill' | 'urgent' | 'general';
 }
 
 export interface ActivityLogEntry {
@@ -169,5 +186,41 @@ export interface FieldTeamLocation {
   };
   totalStopsToday?: number;
   completedStopsToday?: number;
+}
+
+export type DeliverySiteStatus = 'pending' | 'in_progress' | 'urgent' | 'delivered' | 'scheduled';
+export type DeliverySiteCategory =
+  | 'hotel_hospitality'
+  | 'commercial_office'
+  | 'health_hospital'
+  | 'retail_plaza'
+  | 'institution_school'
+  | 'residential';
+
+export interface DeliverySite {
+  id: string;
+  name: string;
+  category: DeliverySiteCategory;
+  status: DeliverySiteStatus;
+  latitude: number;
+  longitude: number;
+  address: string;
+  sector: string;
+  contactPerson: string;
+  contactPhone: string;
+  orderItems: {
+    bottles18_9L: number;
+    bottles13L: number;
+    dispensers?: number;
+  };
+  assignedDriver?: {
+    driverId: string;
+    driverName: string;
+    vehiclePlate: string;
+  };
+  deliveryWindow: string;
+  priority: 'normal' | 'high' | 'urgent';
+  notes?: string;
+  deliveredAt?: string;
 }
 

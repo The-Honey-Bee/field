@@ -7,6 +7,17 @@ const PORT = 3000;
 
 app.use(express.json({ limit: '15mb' }));
 
+// Cross-Origin Resource Sharing (CORS) & Preflight Handling for AI Studio iFrames and clients
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // Lazy AI Client initialization
 let aiClient: GoogleGenAI | null = null;
 function getAi(): GoogleGenAI | null {
@@ -56,14 +67,14 @@ function generateHeuristicRecommendation(
 ) {
   if (!pendingStops || pendingStops.length === 0) {
     return {
-      recommendedStop: 'Central Depot - Ubungo Hub',
-      reason: 'All active delivery dispatches are fulfilled. Return to depot for empty bottle offloading and refill staging.',
+      recommendedStop: 'Central Bottling Plant - Nyakato Industrial Depot',
+      reason: 'All active delivery dispatches are fulfilled in Mwanza. Return to Nyakato plant for empty bottle offloading, cleaning, and next-shift refill staging.',
       urgency: 'normal' as const,
-      estimatedDriveMinutes: 10,
-      batchSuggestion: 'Stage returned empty 18.9L bottles at depot inspection bay.',
+      estimatedDriveMinutes: 12,
+      batchSuggestion: 'Stage returned empty 18.9L bottles at Nyakato inspection bay for sanitization.',
       suggestedActions: [
-        'Offload and sanitize empty return bottles',
-        'Verify driver daily cash reconciliation summary',
+        'Offload and inspect empty return bottles',
+        'Reconcile daily driver cash receipts with Plant Accounts',
       ],
       source: 'logistics_engine',
     };
@@ -71,26 +82,29 @@ function generateHeuristicRecommendation(
 
   const target = pendingStops[0];
   const stopName = target.title || target.customer || 'Commercial Client Drop';
-  const address = target.address || 'Dar es Salaam Corridor';
+  const address = target.address || 'Mwanza Operations Corridor';
   const totalAmount = target.total ? ` (TZS ${Number(target.total).toLocaleString()})` : '';
 
-  let driveMinutes = 12;
-  let reason = `Prioritized route stop along ${currentLocation} corridor. Optimal window to beat peak transit congestion.`;
-  if (/kariakoo|postaa|cbd/i.test(address + stopName)) {
+  let driveMinutes = 10;
+  let reason = `Prioritized route stop along ${currentLocation || 'Mwanza'} sector. Quickest turnaround before afternoon rush.`;
+  if (/tilapia|capripoint|lake/i.test(address + stopName)) {
+    driveMinutes = 14;
+    reason = `Prioritized for Capripoint lakefront hospitality receiving dock schedule.`;
+  } else if (/buzuruga|nyakato|industrial/i.test(address + stopName)) {
+    driveMinutes = 8;
+    reason = `Close proximity to Nyakato corridor; efficient cluster stop for bulk bottle delivery.`;
+  } else if (/pasiansi|airport|kirumba/i.test(address + stopName)) {
+    driveMinutes = 16;
+    reason = `North Mwanza sector delivery grouped along Airport Road corridor.`;
+  } else if (/nyegezi|butimba/i.test(address + stopName)) {
     driveMinutes = 18;
-    reason = `Prioritized due to commercial receiving dock closing times and upcoming Kariakoo traffic congestion window.`;
-  } else if (/masaki|oysterbay|mikocheni/i.test(address + stopName)) {
-    driveMinutes = 15;
-    reason = `Grouped residential drop to optimize fuel economy along Bagamoyo Road.`;
-  } else if (/ubungo|sinza|mwenge/i.test(address + stopName)) {
-    driveMinutes = 9;
-    reason = `Proximity advantage near current location. Quick turnaround delivery.`;
+    reason = `South Mwanza corridor; optimal delivery window before transit hub traffic peak.`;
   }
 
   const secondary = pendingStops[1];
   const batchSuggestion = secondary
     ? `Follow immediately with ${secondary.title || secondary.customer} (${secondary.address || 'nearby'}) on the same delivery run.`
-    : 'Clear remaining vehicle inventory before afternoon plant refill cutoff.';
+    : 'Clear remaining vehicle inventory before afternoon Nyakato plant staging cutoff.';
 
   return {
     recommendedStop: stopName,
@@ -338,16 +352,16 @@ app.post('/api/recommend-next-stop', async (req, res) => {
 
   // 3. Query Gemini API
   try {
-    const systemInstruction = `You are the Zamzam Water Logistics Route Optimizer for Dar es Salaam, Tanzania.
+    const systemInstruction = `You are the Zamzam Water Logistics Route Optimizer for Mwanza Plant, Lake Victoria, Tanzania.
 Analyze the driver's delivery route, truck bottle inventory, and time of day to determine the single best NEXT delivery stop.
-Consider traffic patterns in Dar es Salaam (e.g., Bagamoyo Rd, Morogoro Rd, Kariakoo congestion, early afternoon shop closing hours).
+Consider traffic patterns in Mwanza (e.g., Nyakato industrial corridor, Buzuruga market, Capripoint lakefront hotels, Kirumba/Airport Road, Nyegezi bus terminal).
 Respond strictly with valid JSON with the following structure:
 {
   "recommendedStop": "Name of the customer/stop",
-  "reason": "1-2 crisp sentences explaining why this stop is prioritized now (e.g. closing time, overdue collection, traffic window)",
+  "reason": "1-2 crisp sentences explaining why this stop is prioritized now (e.g. hospitality check-in, traffic window, empty bottle staging)",
   "urgency": "high" | "medium" | "normal",
   "estimatedDriveMinutes": number,
-  "batchSuggestion": "1 sentence suggestion on grouping subsequent drops or empty bottle pick-ups",
+  "batchSuggestion": "1 sentence suggestion on grouping subsequent drops or empty bottle pick-ups in Mwanza",
   "suggestedActions": ["Action 1", "Action 2"]
 }`;
 
@@ -359,10 +373,14 @@ Pending Scheduled Deliveries: ${JSON.stringify(pendingStops)}
 
 Recommend the best next stop now.`;
 
-    let response;
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('AI query timed out')), 5000)
+    );
+
+    let response: any;
     let modelUsed = 'gemini-3.8-flash';
     try {
-      response = await ai.models.generateContent({
+      const call = ai.models.generateContent({
         model: 'gemini-3.8-flash',
         contents: prompt,
         config: {
@@ -370,11 +388,12 @@ Recommend the best next stop now.`;
           systemInstruction,
         },
       });
+      response = await Promise.race([call, timeoutPromise]);
     } catch (primaryErr: any) {
       if (isTransientAiError(primaryErr)) {
         // Try fallback to gemini-3.1-flash-lite if primary model has high demand or rate limits
         try {
-          response = await ai.models.generateContent({
+          const call2 = ai.models.generateContent({
             model: 'gemini-3.1-flash-lite',
             contents: prompt,
             config: {
@@ -382,6 +401,7 @@ Recommend the best next stop now.`;
               systemInstruction,
             },
           });
+          response = await Promise.race([call2, timeoutPromise]);
           modelUsed = 'gemini-3.1-flash-lite';
         } catch {
           throw primaryErr; // rethrow to enter transient cooldown handling
@@ -624,7 +644,20 @@ app.get('/api/products', async (req, res) => {
 
     if (response.ok) {
       const data = await response.json();
-      return res.json({ success: true, source: 'supabase', products: data });
+      const normalizedProducts = Array.isArray(data)
+        ? data.map((p: any) => {
+            if (
+              p.id === 2 ||
+              String(p.name || '').includes('18.9L') &&
+                !String(p.name || '').includes('/R') &&
+                !String(p.name || '').includes('NEW')
+            ) {
+              return { ...p, price: 8000 };
+            }
+            return p;
+          })
+        : data;
+      return res.json({ success: true, source: 'supabase', products: normalizedProducts });
     }
 
     const errorData = await response.json().catch(() => ({}));
@@ -636,6 +669,146 @@ app.get('/api/products', async (req, res) => {
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message, products: [] });
+  }
+});
+
+// Customers directory endpoint proxying Supabase table https://jwlvtpnhibtmalfdcmbu.supabase.co/rest/v1/customers
+app.get('/api/customers', async (req, res) => {
+  const url = process.env.VITE_SUPABASE_URL || 'https://jwlvtpnhibtmalfdcmbu.supabase.co';
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3bHZ0cG5oaWJ0bWFsZmRjbWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyODI0MDUsImV4cCI6MjEwNDg1ODQwNX0.iTioT1eTznBwtEJfglyQTkgtBt8o33BFPYc0Wtg7ETI';
+
+  try {
+    let authHeader = (req.headers['authorization'] as string) || '';
+
+    // If client does not have session header, authenticate service session
+    if (!authHeader) {
+      try {
+        const loginRes = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+          method: 'POST',
+          headers: {
+            apikey: anonKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: 'field_staff@zamzam.co.tz',
+            password: 'Password123!',
+          }),
+        });
+        if (loginRes.ok) {
+          const authData = await loginRes.json();
+          if (authData?.access_token) {
+            authHeader = `Bearer ${authData.access_token}`;
+          }
+        }
+      } catch (e) {
+        console.warn('[Server] Supabase staff auth attempt failed:', e);
+      }
+    }
+
+    const headers: Record<string, string> = {
+      apikey: anonKey,
+    };
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+
+    console.log('[Supabase Server] 📡 GET /api/customers -> Querying Supabase table "customers"...');
+    const response = await fetch(`${url}/rest/v1/customers?select=*&order=created_at.desc`, {
+      headers,
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log(`[Supabase Server] 📥 Fetched ${data.length} customer records from "customers" table in Supabase:`);
+      console.log(JSON.stringify(data, null, 2));
+      return res.json({ success: true, source: 'supabase', count: data.length, customers: data });
+    }
+
+    const errorData = await response.json().catch(() => ({}));
+    console.warn('[Supabase Server] ⚠️ GET /api/customers error:', errorData);
+    return res.status(response.status).json({
+      success: false,
+      source: 'supabase',
+      error: errorData,
+      customers: [],
+    });
+  } catch (err: any) {
+    console.error('[Supabase Server] ❌ GET /api/customers failure:', err.message);
+    return res.status(500).json({ success: false, error: err.message, customers: [] });
+  }
+});
+
+// Create/insert customer record into Supabase "customers" table
+app.post('/api/customers', async (req, res) => {
+  const url = process.env.VITE_SUPABASE_URL || 'https://jwlvtpnhibtmalfdcmbu.supabase.co';
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3bHZ0cG5oaWJ0bWFsZmRjbWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyODI0MDUsImV4cCI6MjEwNDg1ODQwNX0.iTioT1eTznBwtEJfglyQTkgtBt8o33BFPYc0Wtg7ETI';
+
+  try {
+    let authHeader = (req.headers['authorization'] as string) || '';
+
+    if (!authHeader) {
+      try {
+        const loginRes = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+          method: 'POST',
+          headers: {
+            apikey: anonKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: 'field_staff@zamzam.co.tz',
+            password: 'Password123!',
+          }),
+        });
+        if (loginRes.ok) {
+          const authData = await loginRes.json();
+          if (authData?.access_token) {
+            authHeader = `Bearer ${authData.access_token}`;
+          }
+        }
+      } catch (e) {
+        console.warn('[Server] Supabase staff auth attempt failed:', e);
+      }
+    }
+
+    const headers: Record<string, string> = {
+      apikey: anonKey,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    };
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+
+    const payload = {
+      name: req.body.name,
+      phone: req.body.phone || '',
+      address: req.body.address || '',
+      notes: req.body.notes || '',
+    };
+
+    console.log('[Supabase Server] 📤 POST /api/customers -> Inserting customer into "customers" table in Supabase:', payload);
+    const response = await fetch(`${url}/rest/v1/customers`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('[Supabase Server] ✅ Successfully inserted into "customers" table in Supabase:', data);
+      return res.json({ success: true, source: 'supabase', customer: Array.isArray(data) ? data[0] : data });
+    }
+
+    const errorData = await response.json().catch(() => ({}));
+    console.warn('[Supabase Server] ⚠️ POST /api/customers error:', errorData);
+    return res.status(response.status).json({
+      success: false,
+      source: 'supabase',
+      error: errorData,
+    });
+  } catch (err: any) {
+    console.error('[Supabase Server] ❌ POST /api/customers failure:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

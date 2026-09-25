@@ -1,6 +1,7 @@
 import {
   Product,
   Customer,
+  CustomerSyncLogEntry,
   Order,
   EodReport,
   ChatMessage,
@@ -42,7 +43,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     id: 'prod-2',
     name: 'ZAMZAM Pure Drinking Water',
     size: '18.9L',
-    price: 5000,
+    price: 8000,
     unit: 'Bottle',
     stockAvailable: 220,
   },
@@ -255,16 +256,32 @@ class StorageService {
 
   // --- Products Catalog (Supabase Table: https://jwlvtpnhibtmalfdcmbu.supabase.co/rest/v1/products) ---
   public getProducts(): Product[] {
-    if (typeof window === 'undefined') return INITIAL_PRODUCTS;
+    const enforceStandard18Price = (list: Product[]) =>
+      list.map((p) => {
+        if (
+          p.id === 'prod-2' ||
+          p.id === '2' ||
+          (p.size === '18.9L' &&
+            !p.name?.includes('/R') &&
+            !p.name?.includes('Refill') &&
+            !p.unit?.toLowerCase().includes('refill') &&
+            !p.name?.includes('NEW'))
+        ) {
+          return { ...p, price: 8000 };
+        }
+        return p;
+      });
+
+    if (typeof window === 'undefined') return enforceStandard18Price(INITIAL_PRODUCTS);
     const raw = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
-    if (!raw) return INITIAL_PRODUCTS;
+    if (!raw) return enforceStandard18Price(INITIAL_PRODUCTS);
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) return enforceStandard18Price(parsed);
     } catch {
       // fallback
     }
-    return INITIAL_PRODUCTS;
+    return enforceStandard18Price(INITIAL_PRODUCTS);
   }
 
   public saveProducts(products: Product[]): void {
@@ -325,11 +342,23 @@ class StorageService {
         }
       }
 
+      let price = Number(p.price) || 5000;
+      if (
+        String(p.id) === '2' ||
+        (size === '18.9L' &&
+          !name.includes('/R') &&
+          !name.includes('Refill') &&
+          !unit?.toLowerCase().includes('refill') &&
+          !name.includes('NEW'))
+      ) {
+        price = 8000;
+      }
+
       return {
         id: p.id ? String(p.id) : `prod-${Math.random().toString(36).slice(2, 7)}`,
         name: name,
         size: size,
-        price: Number(p.price) || 5000,
+        price: price,
         unit: unit,
         stockAvailable: Number(p.stock_available ?? p.stockAvailable ?? (name.includes('13L') ? 150 : 200)),
         description: p.description || undefined,
@@ -339,6 +368,45 @@ class StorageService {
   }
 
   // --- Customers ---
+  private customerSyncLogs: CustomerSyncLogEntry[] = [];
+  private customerLogListeners: Array<(entry: CustomerSyncLogEntry) => void> = [];
+
+  public getCustomerSyncLogs(): CustomerSyncLogEntry[] {
+    return [...this.customerSyncLogs];
+  }
+
+  public clearCustomerSyncLogs(): void {
+    this.customerSyncLogs = [];
+  }
+
+  public onCustomerSyncLog(cb: (entry: CustomerSyncLogEntry) => void): () => void {
+    this.customerLogListeners.push(cb);
+    return () => {
+      this.customerLogListeners = this.customerLogListeners.filter((l) => l !== cb);
+    };
+  }
+
+  private appendCustomerLog(
+    entry: Omit<CustomerSyncLogEntry, 'id' | 'timestamp' | 'tableName'> & { count?: number; data?: any }
+  ) {
+    const fullEntry: CustomerSyncLogEntry = {
+      id: 'log-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+      timestamp:
+        new Date().toLocaleTimeString() + '.' + String(new Date().getMilliseconds()).padStart(3, '0'),
+      tableName: 'customers',
+      ...entry,
+    };
+    this.customerSyncLogs.unshift(fullEntry);
+    if (this.customerSyncLogs.length > 100) {
+      this.customerSyncLogs.pop();
+    }
+    this.customerLogListeners.forEach((listener) => {
+      try {
+        listener(fullEntry);
+      } catch {}
+    });
+  }
+
   public getCustomers(): Customer[] {
     const raw = localStorage.getItem(STORAGE_KEYS.CUSTOMERS);
     if (!raw) {
@@ -351,24 +419,341 @@ class StorageService {
     }
   }
 
-  public async fetchCustomersFromCloud(): Promise<Customer[]> {
+  /**
+   * Fetch and log customers list from the "customers" table in Supabase
+   */
+  public async fetchAndLogCustomersFromSupabase(): Promise<Customer[]> {
+    console.group('%c[Supabase:customers] 📡 Fetching Customer List from "customers" Table', 'color: #00C46A; font-weight: bold; font-size: 13px;');
+    console.log('[Supabase:customers] Target Table: "customers"');
+    console.log('[Supabase:customers] Remote Endpoint: https://jwlvtpnhibtmalfdcmbu.supabase.co/rest/v1/customers?select=*&order=created_at.desc');
+    console.log('[Supabase:customers] Query Timestamp:', new Date().toISOString());
+
+    this.appendCustomerLog({
+      direction: 'FROM_SUPABASE',
+      action: 'FETCH',
+      status: 'INFO',
+      message: 'Querying Supabase "customers" table (SELECT * FROM customers ORDER BY created_at DESC)...',
+    });
+
+    let rawData: any[] = [];
+    let fetchSource = 'direct';
+
     try {
+      // 1. First attempt: Direct Supabase client query
       const { data, error } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
-        const cloudCustomers: Customer[] = data.map((c: any) => ({
-          id: c.id?.toString() || 'cust-' + Date.now(),
-          name: c.name || 'Unnamed Client',
-          phone: c.phone || '',
-          address: c.address || '',
-          createdAt: c.created_at || new Date().toISOString(),
-        }));
-        localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(cloudCustomers));
-        return cloudCustomers;
+
+      if (!error && Array.isArray(data)) {
+        rawData = data;
+        fetchSource = 'direct-supabase-client';
+      } else {
+        if (error) {
+          console.warn('[Supabase:customers] Direct client query notice (RLS or anon):', error.message);
+        }
+        // 2. Second attempt: Authenticated backend proxy /api/customers
+        const proxyRes = await fetch('/api/customers');
+        if (proxyRes.ok) {
+          const json = await proxyRes.json();
+          if (json.success && Array.isArray(json.customers)) {
+            rawData = json.customers;
+            fetchSource = 'authenticated-proxy-api';
+          }
+        }
       }
-    } catch {
-      // offline or table not present
+    } catch (err: any) {
+      console.warn('[Supabase:customers] Direct client call failed, attempting proxy fallback:', err);
+      try {
+        const proxyRes = await fetch('/api/customers');
+        if (proxyRes.ok) {
+          const json = await proxyRes.json();
+          if (json.success && Array.isArray(json.customers)) {
+            rawData = json.customers;
+            fetchSource = 'authenticated-proxy-api';
+          }
+        }
+      } catch (proxyErr) {
+        console.error('[Supabase:customers] Both direct and proxy queries failed:', proxyErr);
+      }
     }
-    return this.getCustomers();
+
+    if (rawData && rawData.length > 0) {
+      const cloudCustomers: Customer[] = rawData.map((c: any) => ({
+        id: c.id?.toString() || 'cust-' + Date.now(),
+        name: c.name || 'Unnamed Client',
+        phone: c.phone || '',
+        address: c.address || '',
+        notes: c.notes || '',
+        createdAt: c.created_at || new Date().toISOString(),
+        syncStatus: 'synced' as const,
+      }));
+
+      // Merge with existing local customers (preserving any unique local unsynced ones)
+      const existing = this.getCustomers();
+      const cloudIdMap = new Map(cloudCustomers.map((c) => [c.id, c]));
+      const preservedLocals = existing.filter((e) => e.syncStatus === 'pending' && !cloudIdMap.has(e.id));
+      const combined = [...cloudCustomers, ...preservedLocals];
+
+      localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(combined));
+      cloudCustomers.forEach((c) => offlineDb.put('customers', c));
+
+      // Formatted Console Logging
+      console.log(`%c[Supabase:customers] ✅ Successfully fetched & logged ${cloudCustomers.length} customer records from "customers" table via ${fetchSource}:`, 'color: #00E67A; font-weight: bold;');
+      console.table(
+        cloudCustomers.map((c) => ({
+          'Customer ID': c.id,
+          'Full Name': c.name,
+          'Phone': c.phone,
+          'Address': c.address,
+          'Created At': c.createdAt,
+          'Cloud Status': c.syncStatus,
+        }))
+      );
+      console.log('[Supabase:customers] Raw Payload from Supabase:', rawData);
+      console.groupEnd();
+
+      this.appendCustomerLog({
+        direction: 'FROM_SUPABASE',
+        action: 'FETCH',
+        status: 'SUCCESS',
+        count: cloudCustomers.length,
+        message: `Successfully fetched and logged ${cloudCustomers.length} customer records from Supabase "customers" table via ${fetchSource}.`,
+        data: cloudCustomers,
+      });
+
+      this.addActivityLog({
+        action: 'customers_fetched_from_supabase',
+        entityType: 'customer',
+        entityId: 'supabase-customers-table',
+        description: `Fetched and logged ${cloudCustomers.length} customers from Supabase "customers" table`,
+        status: 'success',
+      });
+
+      return combined;
+    } else {
+      console.log('%c[Supabase:customers] ℹ️ Supabase "customers" table returned 0 records (empty table).', 'color: #F59E0B; font-weight: bold;');
+      console.groupEnd();
+
+      this.appendCustomerLog({
+        direction: 'FROM_SUPABASE',
+        action: 'FETCH',
+        status: 'INFO',
+        count: 0,
+        message: 'Supabase "customers" table returned 0 records (empty table).',
+      });
+
+      return this.getCustomers();
+    }
+  }
+
+  public async fetchCustomersFromCloud(): Promise<Customer[]> {
+    return this.fetchAndLogCustomersFromSupabase();
+  }
+
+  /**
+   * Log and send a single customer to the "customers" table in Supabase
+   */
+  public async logCustomerToSupabase(customerData: {
+    name: string;
+    phone?: string;
+    address?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; customer: Customer; error?: string }> {
+    console.group('%c[Supabase:customers] 📤 Sending Customer Record to "customers" Table', 'color: #00E67A; font-weight: bold; font-size: 13px;');
+    console.log('[Supabase:customers] Target Table: "customers"');
+    console.log('[Supabase:customers] Payload being logged and sent to Supabase:', customerData);
+    console.log('[Supabase:customers] Timestamp:', new Date().toISOString());
+
+    this.appendCustomerLog({
+      direction: 'TO_SUPABASE',
+      action: 'INSERT',
+      status: 'INFO',
+      message: `Sending customer "${customerData.name}" to Supabase "customers" table...`,
+      data: customerData,
+    });
+
+    let insertedRecord: any = null;
+    let methodUsed = 'direct';
+
+    try {
+      // 1. Direct Supabase insert
+      const { data, error } = await supabase
+        .from('customers')
+        .insert({
+          name: customerData.name,
+          phone: customerData.phone || '',
+          address: customerData.address || '',
+          notes: customerData.notes || '',
+        })
+        .select();
+
+      if (!error && data && data.length > 0) {
+        insertedRecord = data[0];
+        methodUsed = 'direct-supabase-client';
+      } else {
+        if (error) console.warn('[Supabase:customers] Direct insert returned:', error.message);
+        // 2. Proxy fallback with authenticated staff token
+        const res = await fetch('/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(customerData),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.customer) {
+            insertedRecord = json.customer;
+            methodUsed = 'authenticated-proxy-api';
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn('[Supabase:customers] Direct insert failed, trying proxy:', err);
+      try {
+        const res = await fetch('/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(customerData),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.customer) {
+            insertedRecord = json.customer;
+            methodUsed = 'authenticated-proxy-api';
+          }
+        }
+      } catch (proxyErr: any) {
+        console.error('[Supabase:customers] Proxy insert also failed:', proxyErr);
+      }
+    }
+
+    const savedCustomer: Customer = {
+      id: insertedRecord?.id?.toString() || 'cust-' + Date.now(),
+      name: customerData.name,
+      phone: customerData.phone || '',
+      address: customerData.address || '',
+      notes: customerData.notes || '',
+      createdAt: insertedRecord?.created_at || new Date().toISOString(),
+      syncStatus: insertedRecord ? 'synced' : 'pending',
+    };
+
+    // Save locally
+    const currentCustomers = this.getCustomers();
+    const existingIdx = currentCustomers.findIndex(
+      (c) => c.id === savedCustomer.id || (c.name === savedCustomer.name && c.phone === savedCustomer.phone)
+    );
+    if (existingIdx >= 0) {
+      currentCustomers[existingIdx] = savedCustomer;
+    } else {
+      currentCustomers.unshift(savedCustomer);
+    }
+    localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(currentCustomers));
+    offlineDb.put('customers', savedCustomer);
+
+    if (insertedRecord) {
+      console.log(`%c[Supabase:customers] ✅ Successfully inserted into "customers" table via ${methodUsed}:`, 'color: #00C46A; font-weight: bold;', insertedRecord);
+      console.table([
+        {
+          'Supabase Record ID': insertedRecord.id,
+          'Name': insertedRecord.name,
+          'Phone': insertedRecord.phone,
+          'Address': insertedRecord.address,
+          'Created At': insertedRecord.created_at,
+          'Method': methodUsed,
+        },
+      ]);
+      console.groupEnd();
+
+      this.appendCustomerLog({
+        direction: 'TO_SUPABASE',
+        action: 'INSERT',
+        status: 'SUCCESS',
+        message: `Successfully inserted & logged customer "${savedCustomer.name}" into Supabase "customers" table (ID: ${savedCustomer.id}).`,
+        data: insertedRecord,
+      });
+
+      this.addActivityLog({
+        action: 'customer_inserted_to_supabase',
+        entityType: 'customer',
+        entityId: savedCustomer.id,
+        description: `Logged and inserted customer "${savedCustomer.name}" to Supabase "customers" table`,
+        status: 'success',
+      });
+
+      return { success: true, customer: savedCustomer };
+    } else {
+      console.warn('[Supabase:customers] ⚠️ Cloud insert offline/queued. Saved to local IndexedDB with syncStatus="pending".');
+      console.groupEnd();
+
+      offlineDb.enqueue({
+        id: savedCustomer.id,
+        entityType: 'customer',
+        action: 'create',
+        data: savedCustomer,
+      });
+
+      this.appendCustomerLog({
+        direction: 'TO_SUPABASE',
+        action: 'INSERT',
+        status: 'ERROR',
+        message: `Customer "${savedCustomer.name}" queued offline; pending background sync to Supabase "customers" table.`,
+        data: savedCustomer,
+      });
+
+      return { success: false, customer: savedCustomer, error: 'Queued offline for sync' };
+    }
+  }
+
+  /**
+   * Sync all pending or local customers to Supabase "customers" table and log results
+   */
+  public async syncAndLogAllCustomersToSupabase(): Promise<{ total: number; synced: number; failed: number; customers: Customer[] }> {
+    console.group('%c[Supabase:customers] 🔄 Synchronizing Local Customers to Supabase "customers" Table', 'color: #00E67A; font-weight: bold; font-size: 13px;');
+    const customers = this.getCustomers();
+    console.log(`[Supabase:customers] Total local customer records: ${customers.length}`);
+
+    this.appendCustomerLog({
+      direction: 'TO_SUPABASE',
+      action: 'SYNC',
+      status: 'INFO',
+      message: `Starting bulk sync of ${customers.length} customer records to Supabase "customers" table...`,
+    });
+
+    let syncedCount = 0;
+    let failedCount = 0;
+
+    for (const customer of customers) {
+      if (customer.syncStatus !== 'synced') {
+        try {
+          const res = await this.logCustomerToSupabase({
+            name: customer.name,
+            phone: customer.phone,
+            address: customer.address,
+            notes: customer.notes,
+          });
+          if (res.success) {
+            syncedCount++;
+            customer.syncStatus = 'synced';
+          } else {
+            failedCount++;
+          }
+        } catch {
+          failedCount++;
+        }
+      }
+    }
+
+    console.log(`[Supabase:customers] 🏁 Synchronization complete: ${syncedCount} synced, ${failedCount} pending/failed.`);
+    console.groupEnd();
+
+    this.appendCustomerLog({
+      direction: 'TO_SUPABASE',
+      action: 'SYNC',
+      status: 'SUCCESS',
+      count: syncedCount,
+      message: `Completed sync to Supabase "customers" table: ${syncedCount} records synced, ${failedCount} pending/failed.`,
+    });
+
+    // Re-fetch fresh state from cloud
+    const updated = await this.fetchAndLogCustomersFromSupabase();
+    return { total: customers.length, synced: syncedCount, failed: failedCount, customers: updated };
   }
 
   public saveCustomer(customer: Omit<Customer, 'id' | 'createdAt'>): Customer {
@@ -382,47 +767,14 @@ class StorageService {
     };
     customers.unshift(newCustomer);
     localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
-    
+
     // Durable persistence into IndexedDB
     offlineDb.put('customers', newCustomer);
 
-    // Log activity
-    this.addActivityLog({
-      action: 'customer_created',
-      entityType: 'customer',
-      entityId: newCustomer.id,
-      description: `New customer registered: ${newCustomer.name} (${isOnline ? 'Direct Cloud' : 'Cached Offline'})`,
-      status: 'success',
+    // Log & push to Supabase
+    this.logCustomerToSupabase(customer).catch((err) => {
+      console.warn('[Storage] Background Supabase customer sync error:', err);
     });
-
-    if (isOnline) {
-      supabase.from('customers').insert({
-        name: newCustomer.name,
-        phone: newCustomer.phone,
-        address: newCustomer.address || '',
-      }).then(
-        () => {},
-        (err) => {
-          console.warn('[Storage] Direct Supabase customer insert failed, queuing offline:', err);
-          newCustomer.syncStatus = 'pending';
-          localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
-          offlineDb.enqueue({
-            id: newCustomer.id,
-            entityType: 'customer',
-            action: 'create',
-            data: newCustomer,
-          });
-        }
-      );
-    } else {
-      offlineDb.enqueue({
-        id: newCustomer.id,
-        entityType: 'customer',
-        action: 'create',
-        data: newCustomer,
-      });
-      requestBackgroundSync();
-    }
 
     return newCustomer;
   }

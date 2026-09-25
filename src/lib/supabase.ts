@@ -12,7 +12,15 @@ const safeSupabaseFetch: typeof fetch = async (input, init) => {
     const res = await fetch(input, init);
     return res;
   } catch (err) {
-    // Unreachable endpoint or network outage: return clean 200 empty JSON array so client falls back gracefully
+    const urlStr = typeof input === 'string' ? input : input instanceof Request ? input.url : '';
+    // For auth endpoints, return empty session format so GoTrue does not throw
+    if (urlStr.includes('/auth/v1/')) {
+      return new Response(JSON.stringify({ data: { session: null, user: null }, error: null }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    // For REST queries, return clean empty list
     return new Response(JSON.stringify([]), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },

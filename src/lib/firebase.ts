@@ -1,14 +1,24 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase App instance singleton
 export const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const firebaseAuth = getAuth(firebaseApp);
 
-// CRITICAL: Must provide firestoreDatabaseId, otherwise it connects to (default) which fails with [code=unavailable]
-export const firestoreDb = getFirestore(firebaseApp, (firebaseConfig as any).firestoreDatabaseId);
+// Initialize Firestore with auto-detect long polling for seamless proxy and iframe network connectivity
+const dbId = (firebaseConfig as any).firestoreDatabaseId;
+export const firestoreDb = (() => {
+  try {
+    return initializeFirestore(firebaseApp, {
+      experimentalAutoDetectLongPolling: true,
+    }, dbId);
+  } catch {
+    // If instance is already initialized, retrieve it
+    return getFirestore(firebaseApp, dbId);
+  }
+})();
 
 export enum OperationType {
   CREATE = 'create',
@@ -60,10 +70,16 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 // Validate backend connection on initialization
 export async function testConnection() {
   try {
-    await getDocFromServer(doc(firestoreDb, 'test', 'connection'));
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('the client is offline or initial connection timed out')), 5000)
+    );
+    await Promise.race([
+      getDocFromServer(doc(firestoreDb, 'test', 'connection')),
+      timeout,
+    ]);
   } catch (error: any) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firestore offline notice: Please check your Firebase connection.');
+    if (error instanceof Error && (error.message.includes('the client is offline') || error.message.includes('timed out'))) {
+      console.info('Firestore offline notice: Operating in offline mode until connection is confirmed.');
     }
   }
 }

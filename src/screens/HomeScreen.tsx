@@ -5,7 +5,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { storageService } from '../services/storage';
 import { TimelineTask, Order } from '../types';
 import { DeliveryCompletionDashboard } from '../components/DeliveryCompletionDashboard';
-import { ProtomapsLiveMap } from '../components/ProtomapsLiveMap';
+import { GoogleMapsLiveMap } from '../components/GoogleMapsLiveMap';
+import { GoogleMapComponent } from '../components/GoogleMapComponent';
 import {
   Sparkles,
   TrendingUp,
@@ -60,6 +61,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
 
   // Real-time Geolocation State
+  const [homeMapTab, setHomeMapTab] = useState<'delivery_sites' | 'fleet_telemetry'>('delivery_sites');
   const [isGpsBroadcasting, setIsGpsBroadcasting] = useState<boolean>(false);
   const [myGpsCoords, setMyGpsCoords] = useState<any>(null);
 
@@ -135,16 +137,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          completedStops: completed.map((o) => ({ customer: o.customerName, address: o.customerAddress || 'Dar es Salaam' })),
+          completedStops: completed.map((o) => ({ customer: o.customerName, address: o.customerAddress || 'Mwanza, Lake Zone' })),
           pendingStops: pending.map((o) => ({
             title: o.customerName,
             customer: o.customerName,
-            address: o.customerAddress || 'Dar es Salaam',
+            address: o.customerAddress || 'Mwanza, Lake Zone',
             total: o.subtotal,
             payment: o.paymentMethod,
           })),
           truckInventory: { bottles18_9L: 26, bottles13L: 14 },
-          currentLocation: 'Morogoro Road, Ubungo, Dar es Salaam',
+          currentLocation: 'Nyakato Industrial Area, Mwanza',
           timeOfDay: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         }),
       });
@@ -403,8 +405,57 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Protomaps Live Operations Map (Mwanza, Tanzania) */}
-      <ProtomapsLiveMap onNavigate={onNavigate} />
+      {/* Map View Mode Tabs */}
+      <div className="flex items-center justify-between gap-3 bg-[#0E1A0E] p-2 rounded-2xl border border-[#2A5038]">
+        <div className="flex items-center gap-1.5 bg-[#1A2E1C] p-1 rounded-xl border border-[#3A5068]/50">
+          <button
+            type="button"
+            onClick={() => setHomeMapTab('delivery_sites')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              homeMapTab === 'delivery_sites'
+                ? 'bg-[#006B3C] text-white shadow-sm'
+                : 'text-[#8899AA] hover:text-white'
+            }`}
+          >
+            <Package className="w-3.5 h-3.5 text-[#00C46A]" />
+            <span>{isSwahili ? 'Maeneo ya Utoaji Mwanza' : 'Active Delivery Sites'}</span>
+            <span className="text-[10px] bg-[#00C46A]/20 text-[#00C46A] px-1.5 py-0.2 rounded-full font-mono">
+              12
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setHomeMapTab('fleet_telemetry')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              homeMapTab === 'fleet_telemetry'
+                ? 'bg-[#006B3C] text-white shadow-sm'
+                : 'text-[#8899AA] hover:text-white'
+            }`}
+          >
+            <Truck className="w-3.5 h-3.5 text-[#60A5FA]" />
+            <span>{isSwahili ? 'Meli ya Magari GPS' : 'Live Fleet Telemetry'}</span>
+          </button>
+        </div>
+
+        <div className="hidden sm:flex items-center gap-2 text-[11px] text-[#8899AA] font-mono pr-2">
+          <span className="w-2 h-2 rounded-full bg-[#00C46A] animate-pulse"></span>
+          <span>Mwanza Basin &bull; Lake Zone</span>
+        </div>
+      </div>
+
+      {/* Google Maps Operations Map View */}
+      {homeMapTab === 'delivery_sites' ? (
+        <GoogleMapComponent
+          height="520px"
+          showFilterBar={true}
+          showQuickStats={true}
+          showRoutes={true}
+          showHubs={true}
+          showZoneBoundary={true}
+        />
+      ) : (
+        <GoogleMapsLiveMap onNavigate={onNavigate} />
+      )}
 
       {/* 3. Recharts Active User Today's Delivery Completion Dashboard */}
       <DeliveryCompletionDashboard

@@ -71,6 +71,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Never intercept external APIs (Google Maps, Firestore, Google APIs, Supabase)
+  if (url.origin !== self.location.origin && !isExternalFont(url)) {
+    return;
+  }
+
+  // Never intercept Vite internal modules or dev server requests
+  if (
+    url.pathname.startsWith('/@') ||
+    url.pathname.startsWith('/node_modules/') ||
+    url.pathname.startsWith('/src/') ||
+    url.pathname.includes('__vite') ||
+    url.pathname.includes('hot-update')
+  ) {
+    return;
+  }
+
   // 1. Navigation requests (HTML pages) - Network-first with instant fallback to cached shell / index.html
   if (request.mode === 'navigate') {
     event.respondWith(
@@ -109,7 +125,7 @@ self.addEventListener('fetch', (event) => {
             caches.open(DYNAMIC_CACHE).then((cache) => cache.put(request, clone));
           }
           return networkResponse;
-        });
+        }).catch(() => new Response('', { status: 200 }));
       })
     );
     return;
