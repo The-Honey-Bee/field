@@ -2,6 +2,7 @@ import {
   Product,
   Customer,
   CustomerSyncLogEntry,
+  CustomerInteraction,
   Order,
   EodReport,
   ChatMessage,
@@ -17,6 +18,7 @@ import { requestBackgroundSync } from './serviceWorkerRegistration';
 const STORAGE_KEYS = {
   ORDERS: 'zamzam_orders',
   CUSTOMERS: 'zamzam_customers',
+  INTERACTIONS: 'zamzam_customer_interactions',
   REPORTS: 'zamzam_eod_reports',
   MESSAGES: 'zamzam_messages',
   LOGS: 'zamzam_activity_logs',
@@ -783,6 +785,68 @@ class StorageService {
     const customers = this.getCustomers().filter((c) => c.id !== id);
     localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
     offlineDb.delete('customers', id);
+  }
+
+  // --- Customer Interactions & History ---
+  public getCustomerInteractions(customerId?: string, customerName?: string): CustomerInteraction[] {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.INTERACTIONS) : null;
+    let list: CustomerInteraction[] = [];
+    if (raw) {
+      try {
+        list = JSON.parse(raw);
+      } catch {
+        list = [];
+      }
+    }
+
+    if (!customerId && !customerName) {
+      return list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    }
+
+    const filtered = list.filter((item) => {
+      if (customerId && item.customerId === customerId) return true;
+      if (customerName && item.customerName.toLowerCase() === customerName.toLowerCase()) return true;
+      return false;
+    });
+
+    return filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }
+
+  public addCustomerInteraction(
+    interaction: Omit<CustomerInteraction, 'id' | 'timestamp'>
+  ): CustomerInteraction {
+    const fullInteraction: CustomerInteraction = {
+      ...interaction,
+      id: 'int-' + Date.now(),
+      timestamp: new Date().toISOString(),
+      syncStatus: this.isOnlineStatus ? 'synced' : 'pending',
+    };
+
+    const list = this.getCustomerInteractions();
+    list.unshift(fullInteraction);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.INTERACTIONS, JSON.stringify(list.slice(0, 500)));
+    }
+
+    this.addActivityLog({
+      action: 'customer_interaction_logged',
+      entityType: 'customer',
+      entityId: fullInteraction.customerId,
+      description: `Logged [${fullInteraction.type.toUpperCase()}] for ${fullInteraction.customerName}: ${fullInteraction.title}`,
+      status: 'success',
+    });
+
+    return fullInteraction;
+  }
+
+  public getCustomerOrders(customerId: string, customerName: string): Order[] {
+    const allOrders = this.getOrders();
+    const cName = customerName ? customerName.trim().toLowerCase() : '';
+    return allOrders.filter((ord) => {
+      if (ord.customerId && ord.customerId === customerId) return true;
+      if (cName && ord.customerName && ord.customerName.trim().toLowerCase() === cName) return true;
+      return false;
+    }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   // --- Orders ---

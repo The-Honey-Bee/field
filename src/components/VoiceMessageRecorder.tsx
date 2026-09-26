@@ -9,7 +9,6 @@ import {
   Play,
   Pause,
   AlertCircle,
-  Radio,
   Sparkles,
   Volume2,
   CheckCircle2,
@@ -19,7 +18,6 @@ import {
   blobToBase64,
   formatAudioDuration,
   getSupportedAudioMimeType,
-  generateSampleRadioTone,
 } from '../utils/audioUtils';
 
 export interface VoiceMessagePayload {
@@ -321,17 +319,6 @@ export const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
     cancelRecording();
   };
 
-  // Fallback / simulated verbal note generator for devices without mic or for rapid testing
-  const handleSimulateVerbalUpdate = (category: 'arrival' | 'delay' | 'refill' | 'status') => {
-    const toneData = generateSampleRadioTone(4, category);
-    setAudioUrl(toneData);
-    setAudioDuration(4);
-    setSelectedCategory(category);
-    const preset = CATEGORY_PRESETS.find((p) => p.id === category);
-    setCaptionText(isSwahili ? preset?.defaultCaptionSw || '' : preset?.defaultCaptionEn || '');
-    setRecorderState('preview');
-  };
-
   return (
     <div className="w-full">
       {/* Idle State: Compact Microphone Action Button */}
@@ -421,36 +408,6 @@ export const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
-          {/* Quick Simulation Option for testing */}
-          <div className="pt-2 border-t border-amber-500/20 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-amber-300 font-semibold flex items-center gap-1">
-              <Radio className="w-3 h-3 text-[#00C46A]" />
-              {isSwahili ? 'Au tumia taarifa ya redio ya majaribio:' : 'Or test with dispatch radio audio:'}
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleSimulateVerbalUpdate('arrival')}
-                className="px-2 py-1 bg-[#1A2E1C] hover:bg-[#006B3C] border border-[#2A5038] text-[10px] text-white rounded-lg font-medium transition-colors"
-              >
-                📍 {isSwahili ? 'Kuwasili' : 'Arrival'}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSimulateVerbalUpdate('delay')}
-                className="px-2 py-1 bg-[#1A2E1C] hover:bg-[#006B3C] border border-[#2A5038] text-[10px] text-white rounded-lg font-medium transition-colors"
-              >
-                ⚠️ {isSwahili ? 'Foleni' : 'Delay'}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSimulateVerbalUpdate('refill')}
-                className="px-2 py-1 bg-[#1A2E1C] hover:bg-[#006B3C] border border-[#2A5038] text-[10px] text-white rounded-lg font-medium transition-colors"
-              >
-                📦 {isSwahili ? 'Ujazo' : 'Refill'}
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
@@ -461,7 +418,7 @@ export const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
           <div className="flex items-center justify-between border-b border-[#243447] pb-2">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-full bg-[#00C46A]/20 flex items-center justify-center text-[#00C46A]">
-                <Radio className="w-3.5 h-3.5" />
+                <Volume2 className="w-3.5 h-3.5" />
               </div>
               <span className="text-xs font-bold text-white">
                 {isSwahili ? 'Kagua Ujumbe wa Sauti wa Uwanjani' : 'Review Verbal Dispatch Note'}

@@ -10,13 +10,14 @@ import {
   calculateDistanceKm,
 } from '../services/geolocation';
 import { FieldTeamLocation } from '../types';
+import { MapTileCacheControls } from './MapTileCacheControls';
+import { mapTileCache, PLANT_COORDINATES } from '../services/mapTileCache';
 import {
   Truck,
   MapPin,
   Navigation as NavIcon,
   Compass,
   Layers,
-  Radio,
   RefreshCw,
   Sparkles,
   Zap,
@@ -31,6 +32,7 @@ import {
   AlertCircle,
   X,
   Crosshair,
+  WifiOff,
 } from 'lucide-react';
 
 interface ProtomapsLiveMapProps {
@@ -148,6 +150,35 @@ export const ProtomapsLiveMap: React.FC<ProtomapsLiveMapProps> = ({
   const [myGpsCoords, setMyGpsCoords] = useState<any>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [isLocating, setIsLocating] = useState<boolean>(false);
+  const [isOfflineActive, setIsOfflineActive] = useState<boolean>(false);
+
+  // Subscribe to Map Tile Cache & Offline Status
+  useEffect(() => {
+    const unsub = mapTileCache.subscribe((stats) => {
+      setIsOfflineActive(stats.isSimulatedOffline || (typeof navigator !== 'undefined' && !navigator.onLine));
+    });
+
+    const handleOnline = () => setIsOfflineActive(mapTileCache.getIsSimulatedOffline());
+    const handleOffline = () => setIsOfflineActive(true);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      unsub();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Center / Fly to Zamzam Mwanza Plant
+  const handleFlyToPlant = () => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    map.flyTo([PLANT_COORDINATES.lat, PLANT_COORDINATES.lng], 16, {
+      duration: 1.2,
+    });
+  };
 
   // Sync theme when sunlight mode toggles
   useEffect(() => {
@@ -687,6 +718,9 @@ export const ProtomapsLiveMap: React.FC<ProtomapsLiveMapProps> = ({
             <Crosshair className="w-4 h-4 text-[#00C46A]" />
           </button>
 
+          {/* Plant Offline Map Cache (IndexedDB) */}
+          <MapTileCacheControls onFlyToPlant={handleFlyToPlant} />
+
           {/* Open Full Supervisor View Button (if onNavigate provided) */}
           {onNavigate && (
             <button
@@ -701,6 +735,32 @@ export const ProtomapsLiveMap: React.FC<ProtomapsLiveMapProps> = ({
           )}
         </div>
       </div>
+
+      {/* Offline Mode Banner */}
+      {isOfflineActive && (
+        <div className="bg-amber-950/90 border-b border-amber-500/50 p-2.5 px-4 flex items-center justify-between text-xs text-amber-200 backdrop-blur-sm">
+          <div className="flex items-center gap-2">
+            <WifiOff className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+            <span>
+              {isSwahili
+                ? 'Hali ya Nje ya Mtandao: Ramani inatumia vipande vya IndexedDB kwa Kiwanda cha Zamzam Mwanza (-2.513339, 32.970645).'
+                : 'Offline Mode Active: Serving map tiles from IndexedDB cache for Zamzam Mwanza Plant (-2.513339, 32.970645).'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="font-mono text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
+              IndexedDB Active
+            </span>
+            <button
+              type="button"
+              onClick={handleFlyToPlant}
+              className="text-[11px] underline text-amber-300 hover:text-white font-medium"
+            >
+              {isSwahili ? 'Kiwandani' : 'Fly to Plant'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 2. Interactive Map View Canvas */}
       <div className="relative w-full overflow-hidden" style={{ height: typeof height === 'number' ? `${height}px` : height }}>
@@ -751,7 +811,7 @@ export const ProtomapsLiveMap: React.FC<ProtomapsLiveMapProps> = ({
         <div className="absolute bottom-3 left-3 z-[400] bg-[#0A1A0F]/90 backdrop-blur-md p-2.5 rounded-xl border border-[#2A5038] shadow-xl max-w-xs text-[11px] hidden sm:block">
           <div className="flex items-center justify-between gap-4 font-semibold text-white mb-1">
             <span className="flex items-center gap-1.5 text-[#00C46A]">
-              <Radio className="w-3 h-3 animate-pulse" />
+              <Compass className="w-3 h-3 text-[#00C46A]" />
               <span>Telemetry Active</span>
             </span>
             <span className="text-[10px] text-[#8899AA] font-mono">
@@ -889,7 +949,7 @@ export const ProtomapsLiveMap: React.FC<ProtomapsLiveMapProps> = ({
             disabled={isLocating}
             className="flex items-center gap-1 text-[11px] font-bold text-[#00C46A] hover:text-white bg-[#1A2E1C] px-2.5 py-1.5 rounded-lg border border-[#3A5068]/50 hover:border-[#00C46A] transition-all"
           >
-            <Radio className={`w-3.5 h-3.5 ${isGpsBroadcasting ? 'animate-pulse text-[#00C46A]' : ''}`} />
+            <NavIcon className={`w-3.5 h-3.5 ${isGpsBroadcasting ? 'text-[#00C46A]' : ''}`} />
             <span>{isGpsBroadcasting ? 'GPS Live: On' : 'Broadcast My GPS'}</span>
           </button>
         </div>

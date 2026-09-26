@@ -28,7 +28,6 @@ import {
   Compass,
   AlertCircle,
   ClipboardList,
-  Radio,
   Navigation as NavIcon,
 } from 'lucide-react';
 import { geolocationService } from '../services/geolocation';
@@ -349,7 +348,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
       <div className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#006B3C]/30 text-[#00C46A] border border-[#00C46A]/30 flex items-center justify-center shrink-0">
-            <Radio className={`w-5 h-5 ${isGpsBroadcasting ? 'animate-pulse text-[#00C46A]' : 'text-[#8899AA]'}`} />
+            <Compass className={`w-5 h-5 ${isGpsBroadcasting ? 'animate-spin text-[#00C46A]' : 'text-[#8899AA]'}`} />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -399,7 +398,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                 : 'bg-[#006B3C] text-white hover:bg-[#008F50] border border-[#00C46A]/40'
             }`}
           >
-            <Radio className="w-3.5 h-3.5" />
+            <NavIcon className="w-3.5 h-3.5" />
             <span>{isGpsBroadcasting ? 'Stop GPS Broadcast' : 'Broadcast My GPS'}</span>
           </button>
         </div>

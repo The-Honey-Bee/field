@@ -16,7 +16,6 @@ import {
   TrendingUp,
   MapPin,
   Sparkles,
-  Radio,
 } from 'lucide-react';
 
 export interface NavigationProps {
@@ -33,7 +32,7 @@ export const SupervisorNavigation: React.FC<NavigationProps> = ({ currentView, o
     { id: 'supervisor', label: isSwahili ? 'Ramani ya GPS' : 'Live Fleet Map', icon: MapPin },
     { id: 'orders', label: isSwahili ? 'Agizo Jipya' : 'New Order', icon: ShoppingCart },
     { id: 'reports', label: isSwahili ? 'Kaguzi za EOD' : 'EOD Audits', icon: FileText },
-    { id: 'messages', label: isSwahili ? 'Mawasiliano' : 'Radio Comms', icon: Radio },
+    { id: 'customers', label: isSwahili ? 'Wateja' : 'Customers', icon: Users },
     { id: 'forms', label: isSwahili ? 'Fomu za Google' : 'Google Forms', icon: ClipboardList },
     { id: 'activity', label: isSwahili ? 'Kumbukumbu' : 'Logs', icon: History },
     { id: 'account', label: isSwahili ? 'Akaunti' : 'Account', icon: User },
@@ -113,14 +112,14 @@ export const SupervisorNavigation: React.FC<NavigationProps> = ({ currentView, o
             </span>
           </button>
           <button
-            onClick={() => onNavigate('messages')}
+            onClick={() => onNavigate('customers')}
             className={`flex flex-col items-center justify-center h-full text-center transition-colors ${
-              currentView === 'messages' ? 'text-blue-400' : 'text-[#8899AA]'
+              currentView === 'customers' ? 'text-blue-400' : 'text-[#8899AA]'
             }`}
           >
-            <Radio className="w-5 h-5 mb-0.5" />
+            <Users className="w-5 h-5 mb-0.5" />
             <span className="text-[10px] font-medium tracking-tight">
-              {isSwahili ? 'Redio' : 'Radio'}
+              {isSwahili ? 'Wateja' : 'Clients'}
             </span>
           </button>
         </div>

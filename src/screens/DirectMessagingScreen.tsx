@@ -11,7 +11,6 @@ import {
   Check,
   CheckCheck,
   Clock,
-  Radio,
   Search,
   Mic,
   Volume2,
@@ -22,7 +21,6 @@ import {
 } from 'lucide-react';
 import { VoiceMessageRecorder, VoiceMessagePayload } from '../components/VoiceMessageRecorder';
 import { VoiceMessagePlayer } from '../components/VoiceMessagePlayer';
-import { generateSampleRadioTone } from '../utils/audioUtils';
 
 interface DirectMessagingScreenProps {
   onNavigate: (view: string) => void;
@@ -106,7 +104,6 @@ export const DirectMessagingScreen: React.FC<DirectMessagingScreenProps> = () =>
           ? 'Nimefika Buzuruga Commercial Plaza salama, chupa 26 za 18.9L zimeshushwa na chupa tupu 20 zimekusanywa.'
           : 'Arrived at Buzuruga Commercial Plaza, offloaded 26x 18.9L bottles and inspected 20 empty returns.',
         messageType: 'voice',
-        audioUrl: generateSampleRadioTone(4, 'arrival'),
         audioDuration: 4,
         voiceCategory: 'arrival',
         createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
@@ -124,7 +121,6 @@ export const DirectMessagingScreen: React.FC<DirectMessagingScreenProps> = () =>
           ? 'Pokea Salim, kazi nzuri. Baada ya Buzuruga rudi mara moja Nyakato kupakia chupa 40 za mchana.'
           : 'Acknowledged Salim, excellent work. Proceed directly to Nyakato plant after Buzuruga to reload 40x 18.9L bottles for the afternoon shift.',
         messageType: 'voice',
-        audioUrl: generateSampleRadioTone(5, 'refill'),
         audioDuration: 5,
         voiceCategory: 'refill',
         createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
@@ -244,9 +240,9 @@ export const DirectMessagingScreen: React.FC<DirectMessagingScreenProps> = () =>
 
         {/* Live Channel Status Pill */}
         <div className="flex items-center gap-2 bg-[#122010] border border-[#2A5038] px-3 py-1.5 rounded-full self-start sm:self-auto shadow-sm">
-          <Radio className="w-3.5 h-3.5 text-[#00C46A] animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-[#00C46A] animate-pulse" />
           <span className="text-[11px] font-semibold text-[#00C46A]">
-            {isSwahili ? 'Mwanza Corridor: Iko Hewani' : 'Mwanza Corridor: Radio Live'}
+            {isSwahili ? 'Mwanza Corridor: Mtandaoni' : 'Mwanza Corridor: Live Comms'}
           </span>
         </div>
       </div>

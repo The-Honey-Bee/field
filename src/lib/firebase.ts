@@ -1,11 +1,9 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
 import { initializeFirestore, getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase App instance singleton
 export const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-export const firebaseAuth = getAuth(firebaseApp);
 
 // Initialize Firestore with auto-detect long polling for seamless proxy and iframe network connectivity
 const dbId = (firebaseConfig as any).firestoreDatabaseId;
@@ -50,15 +48,12 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: firebaseAuth.currentUser?.uid,
-      email: firebaseAuth.currentUser?.email,
-      emailVerified: firebaseAuth.currentUser?.emailVerified,
-      isAnonymous: firebaseAuth.currentUser?.isAnonymous,
-      tenantId: firebaseAuth.currentUser?.tenantId,
-      providerInfo: firebaseAuth.currentUser?.providerData?.map((provider) => ({
-        providerId: provider.providerId,
-        email: provider.email,
-      })) || [],
+      userId: null,
+      email: null,
+      emailVerified: null,
+      isAnonymous: null,
+      tenantId: null,
+      providerInfo: [],
     },
     operationType,
     path,

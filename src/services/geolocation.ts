@@ -7,10 +7,10 @@ export const MWANZA_HUBS = {
   DEPOT_NYAKATO: {
     id: 'hub-nyakato',
     name: 'ZAMZAM Bottling Plant & Central Depot (Nyakato)',
-    shortName: 'Nyakato Main Plant',
-    lat: -2.5280,
-    lng: 32.9350,
-    address: 'Musoma Road, Nyakato Industrial Area, Mwanza',
+    shortName: 'ZAMZAM Mwanza Main Plant',
+    lat: -2.513339,
+    lng: 32.970645,
+    address: 'Nyakato Industrial Area, Mwanza (-2.513339, 32.970645)',
     role: 'Central RO Bottling & Plant Logistics',
     capacity: '4,500x 18.9L Bottles',
   },
@@ -86,11 +86,11 @@ export const MWANZA_HUBS = {
   },
 };
 
-// Backward-compatible alias for any legacy imports
-export const DAR_ES_SALAAM_HUBS = {
-  DEPOT_UBUNGO: MWANZA_HUBS.DEPOT_NYAKATO,
-  ...MWANZA_HUBS,
-};
+// // Backward-compatible alias for any legacy imports
+// export const DAR_ES_SALAAM_HUBS = {
+//   DEPOT_UBUNGO: MWANZA_HUBS.DEPOT_NYAKATO,
+//   ...MWANZA_HUBS,
+// };
 
 // Clean baseline fleet in Mwanza, Tanzania (Lake Zone Corridor)
 export const INITIAL_FLEET: FieldTeamLocation[] = [

@@ -20,7 +20,6 @@ import {
   X,
   ZoomIn,
   MapPin,
-  Radio,
 } from 'lucide-react';
 
 interface SupervisorScreenProps {
@@ -151,7 +150,7 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
               : 'text-[#8899AA] hover:text-white'
           }`}
         >
-          <Radio className="w-3.5 h-3.5 text-[#00C46A] animate-pulse" />
+          <MapPin className="w-3.5 h-3.5 text-[#00C46A]" />
           <span>{isSwahili ? 'Ramani ya Moja kwa Moja' : 'Live GPS Map'}</span>
           <span className="w-2 h-2 rounded-full bg-[#00C46A] animate-ping" />
         </button>

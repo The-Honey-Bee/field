@@ -229,12 +229,12 @@ export const translations: Record<AppLanguage, TranslationDictionary> = {
     // Direct Messaging Screen
     'chat.title': 'Team Dispatch Communications',
     'chat.desc': 'Direct messaging channel between field drivers, supervisors, and central depot logistics.',
-    'chat.contacts': 'Team Contacts & Radio Channels',
+    'chat.contacts': 'Team Contacts & Dispatch Channels',
     'chat.search_contacts': 'Search team members...',
     'chat.type_placeholder': 'Type dispatch message or update...',
     'chat.send': 'Send',
     'chat.status_online': 'Online in Field',
-    'chat.emergency_channel': 'Emergency Dispatch Radio',
+    'chat.emergency_channel': 'Emergency Dispatch Channel',
 
     // Activity Logs Screen
     'logs.title': 'System & Operational Audit Trail',
@@ -526,7 +526,7 @@ export const translations: Record<AppLanguage, TranslationDictionary> = {
     // Direct Messaging Screen
     'chat.title': 'Mawasiliano ya Timu ya Usambazaji',
     'chat.desc': 'Kituo cha ujumbe wa moja kwa moja kati ya madereva nyanjani, wasimamizi na stoo kuu.',
-    'chat.contacts': 'Mawasiliano ya Timu na Idhaa za Redio',
+    'chat.contacts': 'Mawasiliano ya Timu na Idhaa za Usambazaji',
     'chat.search_contacts': 'Tafuta mwanachama wa timu...',
     'chat.type_placeholder': 'Andika ujumbe wa usambazaji au taarifa...',
     'chat.send': 'Tuma',

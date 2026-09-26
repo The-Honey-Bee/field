@@ -10,6 +10,8 @@ import {
   calculateDistanceKm,
 } from '../services/geolocation';
 import { FieldTeamLocation, TeamFieldStatus } from '../types';
+import { MapTileCacheControls } from './MapTileCacheControls';
+import { mapTileCache, PLANT_COORDINATES } from '../services/mapTileCache';
 import {
   Truck,
   Navigation as NavIcon,
@@ -29,7 +31,6 @@ import {
   CheckCircle2,
   Package,
   Activity,
-  Radio,
   MapPin,
   ChevronRight,
   Maximize2,
@@ -37,6 +38,8 @@ import {
   Sparkles,
   Building2,
   Waves,
+  WifiOff,
+  HardDrive,
 } from 'lucide-react';
 
 interface SupervisorLiveMapProps {
@@ -131,6 +134,35 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [isLocatingSupervisor, setIsLocatingSupervisor] = useState<boolean>(false);
   const [cleanFeedback, setCleanFeedback] = useState<string | null>(null);
+  const [isOfflineActive, setIsOfflineActive] = useState<boolean>(false);
+
+  // Subscribe to Map Tile Cache & Offline Status
+  useEffect(() => {
+    const unsub = mapTileCache.subscribe((stats) => {
+      setIsOfflineActive(stats.isSimulatedOffline || (typeof navigator !== 'undefined' && !navigator.onLine));
+    });
+
+    const handleOnline = () => setIsOfflineActive(mapTileCache.getIsSimulatedOffline());
+    const handleOffline = () => setIsOfflineActive(true);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      unsub();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Quick Fly to Zamzam Mwanza Plant (-2.513339, 32.970645)
+  const handleFlyToPlant = () => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([PLANT_COORDINATES.lat, PLANT_COORDINATES.lng], 16, {
+        duration: 1.5,
+      });
+    }
+  };
 
   // Mount tile layer (either Protomaps Vector MVT or raster fallback)
   const mountTileLayer = (map: L.Map, themeKey: MapThemeKey) => {
@@ -736,7 +768,7 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
         <div className="p-3.5 sm:p-4 bg-[#142416] border-b border-[#2A5038] flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#006B3C] text-white flex items-center justify-center border border-[#00C46A]/40 shadow-sm">
-              <Radio className="w-5 h-5 text-[#00C46A] animate-pulse" />
+              <MapPin className="w-5 h-5 text-[#00C46A]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -894,8 +926,37 @@ export const SupervisorLiveMap: React.FC<SupervisorLiveMapProps> = ({ onNavigate
                 </>
               )}
             </button>
+
+            {/* Offline Map Tile Cache Controls (IndexedDB) */}
+            <MapTileCacheControls onFlyToPlant={handleFlyToPlant} />
           </div>
         </div>
+
+        {/* Offline Mode Alert Banner */}
+        {isOfflineActive && (
+          <div className="bg-amber-950/90 border-b border-amber-500/50 p-2.5 px-4 flex items-center justify-between text-xs text-amber-200 backdrop-blur-sm">
+            <div className="flex items-center gap-2">
+              <WifiOff className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+              <span>
+                {isSwahili
+                  ? 'Hali ya Nje ya Mtandao: Ramani inatumia vipande vilivyohifadhiwa kwenye IndexedDB kwa Kiwanda cha Zamzam Mwanza (-2.513339, 32.970645).'
+                  : 'Offline Mode Active: Serving map tiles from IndexedDB cache for Zamzam Mwanza Plant (-2.513339, 32.970645).'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="font-mono text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
+                IndexedDB Active
+              </span>
+              <button
+                type="button"
+                onClick={handleFlyToPlant}
+                className="text-[11px] underline text-amber-300 hover:text-white font-medium"
+              >
+                {isSwahili ? 'Kiwandani' : 'Fly to Plant'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Clean Data Feedback Toast */}
         {cleanFeedback && (

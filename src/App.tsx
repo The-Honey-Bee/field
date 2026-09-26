@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
-import { Navbar } from './components/Navbar';
+import { Navbar, openSidebarMenu } from './components/Navbar';
 import {
   Navigation,
   SupervisorNavigation,
@@ -99,6 +99,9 @@ const AppContent: React.FC = () => {
         return <ActivityLogScreen onNavigate={setCurrentView} />;
       case 'account':
         return <AccountManagementScreen onNavigate={setCurrentView} />;
+      case 'menu':
+        openSidebarMenu();
+        return renderRoleHomeScreen();
       default:
         return renderRoleHomeScreen();
     }

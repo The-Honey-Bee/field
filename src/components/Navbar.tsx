@@ -12,6 +12,12 @@ interface NavbarProps {
   onNavigate: (view: string) => void;
 }
 
+export const openSidebarMenu = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('zamzam_open_sidebar_menu'));
+  }
+};
+
 export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
   const { user } = useAuth();
   const { isSwahili } = useLanguage();
@@ -39,6 +45,13 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
     };
   }, []);
 
+  // Global listener to trigger sidebar menu from anywhere in the app
+  useEffect(() => {
+    const handleOpen = () => setShowSidebar(true);
+    window.addEventListener('zamzam_open_sidebar_menu', handleOpen);
+    return () => window.removeEventListener('zamzam_open_sidebar_menu', handleOpen);
+  }, []);
+
   const handleManualSync = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (isSyncing) return;
@@ -58,7 +71,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
   };
 
   return (
-    <header className={`sticky top-0 ${showSidebar ? 'z-[100]' : 'z-40'} w-full bg-[#0A1A0F]/90 backdrop-blur-md border-b border-[#243447]`}>
+    <header className="sticky top-0 z-40 w-full bg-[#0A1A0F]/90 backdrop-blur-md border-b border-[#243447]">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Brand & View Name */}
         <div className="flex items-center gap-2.5 sm:gap-3 cursor-pointer min-w-0 shrink" onClick={() => onNavigate('home')}>
@@ -126,8 +139,16 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
           <button
             type="button"
             id="btn-open-sidebar-menu"
-            onClick={() => setShowSidebar(true)}
-            className="flex items-center gap-2 sm:gap-2.5 bg-[#122010] hover:bg-[#1A2E1C] border border-[#3A5068] hover:border-[#00C46A] px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white transition-all shadow-xs shrink-0 whitespace-nowrap group cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowSidebar(true);
+            }}
+            aria-expanded={showSidebar}
+            aria-haspopup="dialog"
+            aria-controls="zamzam-sidebar-menu-portal"
+            className={`flex items-center gap-2 sm:gap-2.5 bg-[#122010] hover:bg-[#1A2E1C] border ${
+              showSidebar ? 'border-[#00C46A] ring-2 ring-[#00C46A]/50 bg-[#162719]' : 'border-[#3A5068] hover:border-[#00C46A]'
+            } px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white transition-all shadow-xs shrink-0 whitespace-nowrap group cursor-pointer`}
             title="Open Menu (Profile, Connectivity & Sync, Sunlight Mode, Language & Settings)"
             aria-label="Open Sidebar Menu"
           >

@@ -3,7 +3,6 @@ import { useLanguage } from '../context/LanguageContext';
 import {
   Mic,
   MicOff,
-  Radio,
   Volume2,
   Globe,
   Trash2,
@@ -330,7 +329,7 @@ export const VoiceDictationInput: React.FC<VoiceDictationInputProps> = ({
         <div className="bg-[#0A2616] border border-[#00C46A] p-3 rounded-xl flex items-center justify-between gap-3 text-xs animate-fade-in shadow-inner">
           <div className="flex items-center gap-2.5">
             <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-[#00C46A]/20 text-[#00C46A]">
-              <Radio className="w-4 h-4 animate-spin text-[#00C46A]" />
+              <Mic className="w-4 h-4 animate-pulse text-[#00C46A]" />
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
             </div>
             <div>

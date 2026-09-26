@@ -68,7 +68,15 @@ export const OrderPaymentScreen: React.FC<OrderPaymentScreenProps> = ({ onNaviga
   };
 
   useEffect(() => {
-    setCustomers(storageService.getCustomers());
+    const cachedCustomers = storageService.getCustomers();
+    setCustomers(cachedCustomers);
+
+    const preselected = localStorage.getItem('zamzam_preselected_customer');
+    if (preselected) {
+      setSelectedCustomer(preselected);
+      localStorage.removeItem('zamzam_preselected_customer');
+    }
+
     storageService.fetchCustomersFromCloud().then((cloudData) => {
       if (cloudData && cloudData.length > 0) {
         setCustomers(cloudData);

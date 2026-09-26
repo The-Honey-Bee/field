@@ -49,6 +49,7 @@ export interface Order {
   id: string;
   localId?: string;
   staffId: string;
+  customerId?: string;
   customerName: string;
   customerAddress?: string;
   paymentMethod: PaymentMethod;
@@ -98,10 +99,33 @@ export interface Customer {
   name: string;
   phone: string;
   address?: string;
+  territory?: string;
   notes?: string;
   createdBy?: string;
   createdAt: string;
   syncStatus?: 'synced' | 'pending' | 'failed';
+}
+
+export type CustomerInteractionType =
+  | 'order'
+  | 'call'
+  | 'visit'
+  | 'payment'
+  | 'refill'
+  | 'survey'
+  | 'note';
+
+export interface CustomerInteraction {
+  id: string;
+  customerId: string;
+  customerName: string;
+  type: CustomerInteractionType;
+  title: string;
+  description: string;
+  staffName?: string;
+  amount?: number;
+  timestamp: string;
+  syncStatus?: 'synced' | 'pending';
 }
 
 export interface CustomerSyncLogEntry {

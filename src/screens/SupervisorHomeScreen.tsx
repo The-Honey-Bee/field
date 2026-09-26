@@ -14,7 +14,6 @@ import {
   Truck,
   AlertTriangle,
   MapPin,
-  Radio,
   FileCheck,
   ChevronRight,
   Eye,
@@ -102,8 +101,8 @@ export const SupervisorHomeScreen: React.FC<SupervisorHomeScreenProps> = ({ onNa
                 <span>&bull;</span>
                 <span className="font-mono text-[#D0E8F0]">ID: {user?.employeeId || 'ZZ-MWZ-SUP-01'}</span>
                 <span>&bull;</span>
-                <span className="text-[#00C46A] flex items-center gap-1">
-                  <Radio className="w-3 h-3 animate-pulse" /> Lake Zone Live Dispatch
+                <span className="text-[#00C46A] flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#00C46A] animate-pulse" /> Lake Zone Live Dispatch
                 </span>
               </p>
             </div>
@@ -118,11 +117,11 @@ export const SupervisorHomeScreen: React.FC<SupervisorHomeScreenProps> = ({ onNa
               <span>{isSwahili ? 'Agizo la Haraka' : 'Create Order'}</span>
             </button>
             <button
-              onClick={() => onNavigate('messages')}
+              onClick={() => onNavigate('customers')}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-[#1A2E1C] hover:bg-[#243E26] text-white rounded-xl text-xs font-semibold border border-[#2A5038] transition"
             >
-              <Radio className="w-3.5 h-3.5 text-blue-400" />
-              <span>{isSwahili ? 'Mawasiliano ya Redio' : 'Radio Broadcast'}</span>
+              <Users className="w-3.5 h-3.5 text-[#00C46A]" />
+              <span>{isSwahili ? 'Orodha ya Wateja' : 'Customer Registry'}</span>
             </button>
             <button
               onClick={loadData}
@@ -223,7 +222,7 @@ export const SupervisorHomeScreen: React.FC<SupervisorHomeScreenProps> = ({ onNa
             activeTab === 'map' ? 'bg-[#006B3C] text-white shadow' : 'text-[#8899AA] hover:text-white'
           }`}
         >
-          <Radio className="w-3.5 h-3.5 text-[#00C46A] animate-pulse" />
+          <MapPin className="w-3.5 h-3.5 text-[#00C46A]" />
           <span>{isSwahili ? 'Ramani ya GPS' : 'Live Fleet Map'}</span>
         </button>
 
@@ -394,11 +393,11 @@ export const SupervisorHomeScreen: React.FC<SupervisorHomeScreenProps> = ({ onNa
                     <span>{isSwahili ? 'Fuatilia Magari ya Lake Zone' : 'Track Lake Zone Fleet'}</span>
                   </button>
                   <button
-                    onClick={() => onNavigate('messages')}
+                    onClick={() => onNavigate('customers')}
                     className="w-full py-2 bg-[#122010] hover:bg-[#1A2E1C] text-[#8899AA] hover:text-white rounded-lg text-xs font-medium border border-[#243447] transition flex items-center justify-center gap-2"
                   >
-                    <Radio className="w-4 h-4 text-blue-400" />
-                    <span>{isSwahili ? 'Tuma Ujumbe wa Timu' : 'Team Broadcast Radio'}</span>
+                    <Users className="w-4 h-4 text-[#00C46A]" />
+                    <span>{isSwahili ? 'Tazama Orodha ya Wateja' : 'Customer & Client Registry'}</span>
                   </button>
                   <button
                     onClick={() => onNavigate('forms')}

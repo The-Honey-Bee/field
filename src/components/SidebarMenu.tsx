@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
@@ -79,7 +80,12 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted || typeof document === 'undefined') return null;
 
   const getRoleBadge = (r: UserRole) => {
     switch (r) {
@@ -101,22 +107,65 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] overflow-hidden">
-      {/* Dimmed backdrop */}
+  return createPortal(
+    <div
+      className="fixed inset-0 overflow-hidden"
+      id="zamzam-sidebar-menu-portal"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 2147483647,
+        pointerEvents: 'auto',
+      }}
+    >
+      {/* Dimmed backdrop covering full viewport */}
       <div
-        className="fixed inset-0 bg-black/75 backdrop-blur-xs transition-opacity animate-in fade-in duration-200 z-[100]"
+        className="fixed inset-0 bg-black/80 backdrop-enter cursor-pointer"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
+          zIndex: 2147483646,
+        }}
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Slide-out Sidebar Drawer */}
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10 z-[100]">
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          bottom: 0,
+          right: 0,
+          width: '100%',
+          maxWidth: '440px',
+          height: '100vh',
+          height: '100dvh',
+          zIndex: 2147483647,
+          display: 'flex',
+          pointerEvents: 'auto',
+        }}
+      >
         <aside
           role="dialog"
           aria-label="Sidebar Menu"
           aria-modal="true"
-          className="w-screen max-w-md bg-[#0D1E12] border-l border-[#243447] text-[#D0E8F0] shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-300 select-none overflow-hidden relative z-[100]"
+          className="w-full h-full bg-[#0D1E12] border-l border-[#243447] text-[#D0E8F0] shadow-2xl flex flex-col justify-between select-none overflow-hidden relative sidebar-drawer-enter"
+          style={{
+            boxShadow: '-12px 0 50px rgba(0, 0, 0, 0.9)',
+            transform: 'translateX(0)',
+          }}
         >
           {/* Top Header - Brought to front over everything */}
           <div className="relative z-50 px-5 py-4 bg-[#0A1A0F] border-b border-[#243447] flex items-center justify-between shrink-0 shadow-lg shadow-black/50">
@@ -472,6 +521,7 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
           </div>
         </aside>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

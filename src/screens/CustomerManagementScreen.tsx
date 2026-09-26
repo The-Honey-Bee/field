@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { storageService } from '../services/storage';
-import { Customer, CustomerSyncLogEntry } from '../types';
+import { Customer, CustomerSyncLogEntry, Order } from '../types';
 import { useLanguage } from '../context/LanguageContext';
+import { CustomerActivitySidebar } from '../components/CustomerActivitySidebar';
 import {
   Users,
   Search,
@@ -24,19 +25,51 @@ import {
   Cloud,
   ChevronDown,
   ChevronUp,
+  Download,
+  Filter,
+  History,
+  Tag,
+  ArrowUpDown,
+  RotateCcw,
+  ExternalLink,
 } from 'lucide-react';
 
 interface CustomerManagementScreenProps {
   onNavigate: (view: string) => void;
 }
 
+const DEFAULT_TERRITORIES = [
+  'Ilala / Posta',
+  'Kinondoni / Masaki',
+  'Temeke',
+  'Ubungo',
+  'Kigamboni',
+  'Mikocheni / Mwenge',
+  'Tegeta / Kunduchi',
+  'Kariakoo / Upanga',
+  'Mbezi Beach / Kawe',
+];
+
 export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> = ({ onNavigate }) => {
   const { isSwahili } = useLanguage();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  // Search & Filter State
   const [search, setSearch] = useState<string>('');
+  const [selectedTerritory, setSelectedTerritory] = useState<string>('ALL');
+  const [selectedSyncStatus, setSelectedSyncStatus] = useState<'ALL' | 'synced' | 'pending'>('ALL');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name-asc' | 'name-desc' | 'orders'>('newest');
+
+  // Activity History Sidebar State
+  const [selectedCustomerForSidebar, setSelectedCustomerForSidebar] = useState<Customer | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+
+  // Add Customer Modal State
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [name, setName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
+  const [territory, setTerritory] = useState<string>('Kinondoni / Masaki');
   const [address, setAddress] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -50,10 +83,11 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [copiedLogs, setCopiedLogs] = useState<boolean>(false);
 
-  // Load customers and subscribe to live customer logs
+  // Load customers, orders, and subscribe to live customer logs
   useEffect(() => {
     // 1. Initial local load
     setCustomers(storageService.getCustomers());
+    setOrders(storageService.getOrders());
     setLogs(storageService.getCustomerSyncLogs());
 
     // 2. Fetch and log customers list from Supabase on mount
@@ -78,6 +112,7 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
       } else {
         setCustomers(storageService.getCustomers());
       }
+      setOrders(storageService.getOrders());
       setLogs(storageService.getCustomerSyncLogs());
 
       if (showToast) {
@@ -131,6 +166,7 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
     const payload = {
       name: name.trim(),
       phone: phone.trim() || '+255 700 000 000',
+      territory: territory.trim() || 'Dar es Salaam',
       address: address.trim() || 'Dar es Salaam',
       notes: notes.trim() || undefined,
     };
@@ -161,6 +197,10 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
     if (confirm(confirmPrompt)) {
       storageService.deleteCustomer(id);
       setCustomers(storageService.getCustomers());
+      if (selectedCustomerForSidebar?.id === id) {
+        setIsSidebarOpen(false);
+        setSelectedCustomerForSidebar(null);
+      }
       setFeedback(isSwahili ? 'Mteja ameondolewa' : 'Customer removed');
       setTimeout(() => setFeedback(null), 3000);
     }
@@ -180,23 +220,228 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
     setTimeout(() => setCopiedLogs(false), 2000);
   };
 
+  // Open Activity History sidebar
+  const handleOpenActivityHistory = (cust: Customer) => {
+    setSelectedCustomerForSidebar(cust);
+    setIsSidebarOpen(true);
+  };
+
+  // Preselect customer and navigate to orders
+  const handleCreateOrderForCustomer = (cust: Customer) => {
+    try {
+      localStorage.setItem('zamzam_preselected_customer', cust.name);
+    } catch {}
+    setIsSidebarOpen(false);
+    onNavigate('orders');
+  };
+
+  // Helper to detect territory from address if not explicitly set
+  const getCustomerTerritory = (cust: Customer): string => {
+    if (cust.territory) return cust.territory;
+    if (!cust.address) return 'Dar es Salaam';
+    const addr = cust.address.toLowerCase();
+    for (const t of DEFAULT_TERRITORIES) {
+      const parts = t.toLowerCase().split(/[\s/]+/);
+      for (const part of parts) {
+        if (part.length > 3 && addr.includes(part)) {
+          return t;
+        }
+      }
+    }
+    return 'Dar es Salaam';
+  };
+
+  // List of all unique territories dynamically extracted from customers
+  const allAvailableTerritories = useMemo(() => {
+    const set = new Set<string>(DEFAULT_TERRITORIES);
+    customers.forEach((c) => {
+      if (c.territory && c.territory.trim()) {
+        set.add(c.territory.trim());
+      }
+    });
+    return Array.from(set);
+  }, [customers]);
+
+  // Order count lookup map
+  const customerOrderCountMap = useMemo(() => {
+    const counts: Record<string, number> = {};
+    orders.forEach((ord) => {
+      const nameKey = ord.customerName?.trim().toLowerCase();
+      if (nameKey) {
+        counts[nameKey] = (counts[nameKey] || 0) + 1;
+      }
+      if (ord.customerId) {
+        counts[ord.customerId] = (counts[ord.customerId] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [orders]);
+
+  // Filtered and Sorted Customer List
+  const filtered = useMemo(() => {
+    return customers
+      .filter((c) => {
+        // 1. Search Query Filter (name, phone, territory, address, notes)
+        const q = search.trim().toLowerCase();
+        const matchesSearch =
+          !q ||
+          c.name.toLowerCase().includes(q) ||
+          c.phone.toLowerCase().includes(q) ||
+          (c.territory && c.territory.toLowerCase().includes(q)) ||
+          (c.address && c.address.toLowerCase().includes(q)) ||
+          (c.notes && c.notes.toLowerCase().includes(q));
+
+        if (!matchesSearch) return false;
+
+        // 2. Territory Filter
+        if (selectedTerritory !== 'ALL') {
+          const custTerritory = getCustomerTerritory(c).toLowerCase();
+          const filterTerritory = selectedTerritory.toLowerCase();
+          const matchesTerritory =
+            custTerritory.includes(filterTerritory) || filterTerritory.includes(custTerritory);
+          if (!matchesTerritory) return false;
+        }
+
+        // 3. Sync Status Filter
+        if (selectedSyncStatus !== 'ALL') {
+          const status = c.syncStatus || 'pending';
+          if (status !== selectedSyncStatus) return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'newest') {
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        }
+        if (sortBy === 'oldest') {
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        }
+        if (sortBy === 'name-asc') {
+          return a.name.localeCompare(b.name);
+        }
+        if (sortBy === 'name-desc') {
+          return b.name.localeCompare(a.name);
+        }
+        if (sortBy === 'orders') {
+          const countA = (customerOrderCountMap[a.id] || 0) + (customerOrderCountMap[a.name.toLowerCase()] || 0);
+          const countB = (customerOrderCountMap[b.id] || 0) + (customerOrderCountMap[b.name.toLowerCase()] || 0);
+          return countB - countA;
+        }
+        return 0;
+      });
+  }, [customers, search, selectedTerritory, selectedSyncStatus, sortBy, customerOrderCountMap]);
+
+  // Export Filtered Customer List to CSV
+  const handleExportCsv = () => {
+    if (filtered.length === 0) {
+      setFeedback(
+        isSwahili ? 'Hakuna rekodi za wateja za kuhamisha.' : 'No filtered customer records to export.'
+      );
+      setTimeout(() => setFeedback(null), 3000);
+      return;
+    }
+
+    const allOrders = storageService.getOrders();
+    const allInteractions = storageService.getCustomerInteractions();
+
+    const headers = [
+      'Customer ID',
+      'Customer / Business Name',
+      'Phone Number',
+      'Territory',
+      'Physical Delivery Address',
+      'Notes & Cadence',
+      'Cloud Sync Status',
+      'Registration Date',
+      'Lifetime Orders Count',
+      'Total Revenue (TZS)',
+      'Total Interactions Count',
+      'Last Order Date',
+    ];
+
+    const escapeCsv = (val: any) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const rows = filtered.map((c) => {
+      const custOrders = allOrders.filter(
+        (o) =>
+          (o.customerId && o.customerId === c.id) ||
+          (o.customerName && o.customerName.trim().toLowerCase() === c.name.trim().toLowerCase())
+      );
+      const custInteractions = allInteractions.filter(
+        (i) =>
+          i.customerId === c.id ||
+          (i.customerName && i.customerName.trim().toLowerCase() === c.name.trim().toLowerCase())
+      );
+
+      const totalRevenue = custOrders.reduce((sum, o) => sum + (o.subtotal || 0), 0);
+      const lastOrder =
+        custOrders.length > 0
+          ? new Date(custOrders[0].createdAt).toLocaleDateString()
+          : 'None';
+
+      return [
+        escapeCsv(c.id),
+        escapeCsv(c.name),
+        escapeCsv(c.phone),
+        escapeCsv(getCustomerTerritory(c)),
+        escapeCsv(c.address || ''),
+        escapeCsv(c.notes || ''),
+        escapeCsv(c.syncStatus || 'pending'),
+        escapeCsv(new Date(c.createdAt).toLocaleDateString()),
+        escapeCsv(custOrders.length),
+        escapeCsv(totalRevenue),
+        escapeCsv(custInteractions.length),
+        escapeCsv(lastOrder),
+      ].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.setAttribute('download', `zamzam_customers_report_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setFeedback(
+      isSwahili
+        ? `Faili ya CSV ya wateja ${filtered.length} imepakuliwa kikamilifu!`
+        : `Successfully exported ${filtered.length} customer records to CSV!`
+    );
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setSelectedTerritory('ALL');
+    setSelectedSyncStatus('ALL');
+    setSortBy('newest');
+  };
+
+  const hasActiveFilters =
+    search.trim() !== '' ||
+    selectedTerritory !== 'ALL' ||
+    selectedSyncStatus !== 'ALL' ||
+    sortBy !== 'newest';
+
+  const pendingCount = customers.filter((c) => c.syncStatus === 'pending').length;
+
   const filteredLogs = logs.filter((l) => {
     if (logFilter === 'ALL') return true;
     return l.direction === logFilter;
   });
 
-  const filtered = customers.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.toLowerCase().includes(search.toLowerCase()) ||
-      (c.address && c.address.toLowerCase().includes(search.toLowerCase())) ||
-      (c.notes && c.notes.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  const pendingCount = customers.filter((c) => c.syncStatus === 'pending').length;
-
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-24 md:pb-12">
+    <div className="max-w-6xl mx-auto space-y-6 pb-24 md:pb-12">
       {/* Header & Supabase Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#243447] pb-4">
         <div>
@@ -206,12 +451,22 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
           </h1>
           <p className="text-xs text-[#8899AA] mt-0.5">
             {isSwahili
-              ? 'Inawasiliana moja kwa moja na jedwali la "customers" katika Supabase (Fetch & Log).'
-              : 'Direct bidirectional live synchronization with the "customers" table in Supabase.'}
+              ? 'Bofya mteja yeyote kutazama Kumbukumbu ya Historia (Activity History) ya maagizo na mawasiliano.'
+              : 'Click any customer row to view their full chronological Activity History of orders and interactions.'}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {/* CSV Export Button */}
+          <button
+            onClick={handleExportCsv}
+            className="bg-[#122010] hover:bg-[#1A2E1C] border border-[#2A5038] hover:border-[#00C46A] text-white px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-colors shadow-sm"
+            title={isSwahili ? 'Pakua orodha ya wateja kwenye faili la CSV' : 'Export filtered customers to CSV for reporting'}
+          >
+            <Download className="w-3.5 h-3.5 text-[#00C46A]" />
+            <span>{isSwahili ? 'Hamisha CSV' : 'Export CSV'}</span>
+          </button>
+
           {/* Supabase Live Logs Button */}
           <button
             onClick={() => setShowLogsModal(true)}
@@ -301,20 +556,131 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
         </div>
       )}
 
-      {/* Search Bar */}
-      <div className="flex items-center gap-2 bg-[#122010] border border-[#3A5068] px-4 py-2.5 rounded-xl">
-        <Search className="w-4 h-4 text-[#8899AA]" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={
-            isSwahili
-              ? 'Tafuta kwa jina la biashara, nambari ya simu, au anwani ya mtaa...'
-              : 'Search by business name, phone number, or street address...'
-          }
-          className="w-full bg-transparent text-xs text-white placeholder-[#8899AA] focus:outline-none"
-        />
+      {/* Search Bar & Filter Controls Box */}
+      <div className="bg-[#122010] border border-[#2A5038] rounded-2xl p-4 space-y-3 shadow-md">
+        {/* Main Search Input */}
+        <div className="flex items-center gap-2 bg-[#0A1A0F] border border-[#3A5068] px-3.5 py-2.5 rounded-xl">
+          <Search className="w-4 h-4 text-[#8899AA] shrink-0" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={
+              isSwahili
+                ? 'Tafuta mteja kwa jina la biashara, nambari ya simu, au eneo/wilaya...'
+                : 'Search customers by business name, phone number, territory, or delivery address...'
+            }
+            className="w-full bg-transparent text-xs text-white placeholder-[#8899AA] focus:outline-none"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="text-[#8899AA] hover:text-white p-1"
+              title="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Filter Controls Row */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Territory Filter */}
+            <div className="flex items-center gap-1.5 bg-[#0A1A0F] border border-[#2A5038] rounded-xl px-2.5 py-1.5">
+              <MapPin className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />
+              <span className="text-[#8899AA] text-[11px] font-medium hidden sm:inline">
+                {isSwahili ? 'Eneo:' : 'Territory:'}
+              </span>
+              <select
+                value={selectedTerritory}
+                onChange={(e) => setSelectedTerritory(e.target.value)}
+                className="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer pr-2"
+              >
+                <option value="ALL" className="bg-[#0A1A0F] text-white">
+                  {isSwahili ? 'Maeneo Yote (All)' : 'All Territories'}
+                </option>
+                {allAvailableTerritories.map((t) => (
+                  <option key={t} value={t} className="bg-[#0A1A0F] text-white">
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sync Status Filter */}
+            <div className="flex items-center gap-1.5 bg-[#0A1A0F] border border-[#2A5038] rounded-xl px-2.5 py-1.5">
+              <Cloud className="w-3.5 h-3.5 text-[#38BDF8] shrink-0" />
+              <span className="text-[#8899AA] text-[11px] font-medium hidden sm:inline">
+                {isSwahili ? 'Hali ya Wingu:' : 'Sync Status:'}
+              </span>
+              <select
+                value={selectedSyncStatus}
+                onChange={(e) => setSelectedSyncStatus(e.target.value as any)}
+                className="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer pr-2"
+              >
+                <option value="ALL" className="bg-[#0A1A0F] text-white">
+                  {isSwahili ? 'Zote (All)' : 'All Statuses'}
+                </option>
+                <option value="synced" className="bg-[#0A1A0F] text-white">
+                  {isSwahili ? 'Supabase Synced' : 'Supabase Synced'}
+                </option>
+                <option value="pending" className="bg-[#0A1A0F] text-white">
+                  {isSwahili ? 'Pending Cloud Push' : 'Pending Cloud Push'}
+                </option>
+              </select>
+            </div>
+
+            {/* Sort Selector */}
+            <div className="flex items-center gap-1.5 bg-[#0A1A0F] border border-[#2A5038] rounded-xl px-2.5 py-1.5">
+              <ArrowUpDown className="w-3.5 h-3.5 text-[#00C46A] shrink-0" />
+              <span className="text-[#8899AA] text-[11px] font-medium hidden sm:inline">
+                {isSwahili ? 'Panga kwa:' : 'Sort By:'}
+              </span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer pr-2"
+              >
+                <option value="newest" className="bg-[#0A1A0F] text-white">
+                  {isSwahili ? 'Wapya Zaidi' : 'Newest Registered'}
+                </option>
+                <option value="oldest" className="bg-[#0A1A0F] text-white">
+                  {isSwahili ? 'Wa Zamani' : 'Oldest Registered'}
+                </option>
+                <option value="name-asc" className="bg-[#0A1A0F] text-white">
+                  {isSwahili ? 'Jina (A - Z)' : 'Name (A - Z)'}
+                </option>
+                <option value="name-desc" className="bg-[#0A1A0F] text-white">
+                  {isSwahili ? 'Jina (Z - A)' : 'Name (Z - A)'}
+                </option>
+                <option value="orders" className="bg-[#0A1A0F] text-white">
+                  {isSwahili ? 'Wingi wa Maagizo' : 'Most Orders Placed'}
+                </option>
+              </select>
+            </div>
+
+            {/* Reset Button */}
+            {hasActiveFilters && (
+              <button
+                onClick={handleResetFilters}
+                className="inline-flex items-center gap-1 text-[11px] text-[#8899AA] hover:text-[#00C46A] px-2 py-1 transition-colors"
+                title="Reset all filters"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>{isSwahili ? 'Weka Upya' : 'Reset'}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Results Summary Counter */}
+          <div className="text-[11px] text-[#8899AA]">
+            {isSwahili ? 'Inaonyesha wateja' : 'Showing'}{' '}
+            <strong className="text-white">{filtered.length}</strong>{' '}
+            {isSwahili ? 'kati ya' : 'of'}{' '}
+            <strong className="text-white">{customers.length}</strong>
+          </div>
+        </div>
       </div>
 
       {/* Customers Grid or Empty State */}
@@ -325,123 +691,202 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
             {isSwahili ? 'Hakuna Wateja Waliopatikana' : 'No Customers Found'}
           </h3>
           <p className="text-xs text-[#8899AA] max-w-sm mx-auto">
-            {search
-              ? (isSwahili ? `Hakuna mteja anayelingana na "${search}".` : `No customer records matched "${search}".`)
-              : (isSwahili
-                  ? 'Orodha ya wateja haina kumbukumbu. Bofya "Pakua toka Supabase" au sajili mteja mpya.'
-                  : 'Customer directory is clean. Click "Fetch from Supabase" or register a new customer.')}
+            {hasActiveFilters
+              ? isSwahili
+                ? 'Hakuna mteja anayelingana na vichujio ulivyochagua. Jaribu kubadilisha jina au eneo.'
+                : 'No customer records match your current search and filters. Try clearing or relaxing filters.'
+              : isSwahili
+              ? 'Orodha ya wateja haina kumbukumbu. Bofya "Pakua toka Supabase" au sajili mteja mpya.'
+              : 'Customer directory is clean. Click "Fetch from Supabase" or register a new customer.'}
           </p>
           <div className="flex items-center justify-center gap-3 pt-2">
-            <button
-              onClick={() => handleFetchFromSupabase(true)}
-              disabled={isFetching}
-              className="inline-flex items-center gap-1.5 bg-[#122010] hover:bg-[#1A2E1C] border border-[#00C46A] text-[#00C46A] font-bold px-4 py-2 rounded-xl text-xs"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-              <span>{isSwahili ? 'Pakua toka Supabase' : 'Fetch from Supabase'}</span>
-            </button>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center gap-1.5 bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] font-bold px-4 py-2 rounded-xl text-xs"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{isSwahili ? 'Sajili Mteja wa Kwanza' : 'Add First Customer'}</span>
-            </button>
+            {hasActiveFilters ? (
+              <button
+                onClick={handleResetFilters}
+                className="inline-flex items-center gap-1.5 bg-[#122010] hover:bg-[#1A2E1C] border border-[#00C46A] text-[#00C46A] font-bold px-4 py-2 rounded-xl text-xs"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>{isSwahili ? 'Ondoa Vichujio' : 'Clear All Filters'}</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => handleFetchFromSupabase(true)}
+                  disabled={isFetching}
+                  className="inline-flex items-center gap-1.5 bg-[#122010] hover:bg-[#1A2E1C] border border-[#00C46A] text-[#00C46A] font-bold px-4 py-2 rounded-xl text-xs"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+                  <span>{isSwahili ? 'Pakua toka Supabase' : 'Fetch from Supabase'}</span>
+                </button>
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="inline-flex items-center gap-1.5 bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] font-bold px-4 py-2 rounded-xl text-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{isSwahili ? 'Sajili Mteja wa Kwanza' : 'Add First Customer'}</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filtered.map((c) => (
-            <div
-              key={c.id}
-              className="bg-[#122010] p-4 rounded-2xl border border-[#2A5038] flex flex-col justify-between gap-3 shadow-md hover:border-[#00C46A]/50 transition-colors"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-sm font-bold text-white flex items-center gap-2 truncate">
-                    <Building2 className="w-4 h-4 text-[#00C46A] shrink-0" />
-                    <span className="truncate">{c.name}</span>
-                  </h2>
+          {filtered.map((c) => {
+            const territoryLabel = getCustomerTerritory(c);
+            const totalOrders =
+              (customerOrderCountMap[c.id] || 0) +
+              (customerOrderCountMap[c.name.trim().toLowerCase()] || 0);
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {/* Supabase sync badge */}
-                    {c.syncStatus === 'synced' ? (
-                      <span
-                        className="inline-flex items-center gap-1 text-[10px] text-[#00C46A] bg-[#00C46A]/10 border border-[#00C46A]/30 px-2 py-0.5 rounded-full font-medium"
-                        title="Synced with Supabase customers table"
+            return (
+              <div
+                key={c.id}
+                onClick={() => handleOpenActivityHistory(c)}
+                className="bg-[#122010] hover:bg-[#142616] p-4 rounded-2xl border border-[#2A5038] hover:border-[#00C46A] flex flex-col justify-between gap-3 shadow-md transition-all cursor-pointer group"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="text-sm font-bold text-white flex items-center gap-2 truncate group-hover:text-[#00C46A] transition-colors">
+                      <Building2 className="w-4 h-4 text-[#00C46A] shrink-0" />
+                      <span className="truncate">{c.name}</span>
+                    </h2>
+
+                    <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {/* Supabase sync badge */}
+                      {c.syncStatus === 'synced' ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] text-[#00C46A] bg-[#00C46A]/10 border border-[#00C46A]/30 px-2 py-0.5 rounded-full font-medium"
+                          title="Synced with Supabase customers table"
+                        >
+                          <Check className="w-2.5 h-2.5" />
+                          Supabase
+                        </span>
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] text-[#F59E0B] bg-[#F59E0B]/10 border border-[#F59E0B]/30 px-2 py-0.5 rounded-full font-medium"
+                          title="Pending sync to Supabase"
+                        >
+                          <Cloud className="w-2.5 h-2.5" />
+                          Pending
+                        </span>
+                      )}
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(c.id, c.name);
+                        }}
+                        className="text-[#8899AA] hover:text-red-400 p-1 transition-colors"
+                        title={isSwahili ? 'Futa Mteja' : 'Delete Customer'}
                       >
-                        <Check className="w-2.5 h-2.5" />
-                        Supabase
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Customer Information: Phone, Territory, Address, Notes */}
+                  <div className="mt-2.5 space-y-1.5 text-xs text-[#8899AA]">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-3.5 h-3.5 text-[#00C46A] shrink-0" />
+                        <a
+                          href={`tel:${c.phone}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="hover:underline text-[#D0E8F0] font-mono text-[11px]"
+                        >
+                          {c.phone}
+                        </a>
+                      </div>
+
+                      {/* Territory Badge */}
+                      <span className="inline-flex items-center gap-1 text-[10px] bg-[#0A1A0F] text-[#F59E0B] border border-[#F59E0B]/30 px-2 py-0.5 rounded-md font-medium truncate max-w-[140px]">
+                        <Tag className="w-2.5 h-2.5 shrink-0" />
+                        <span className="truncate">{territoryLabel}</span>
                       </span>
-                    ) : (
-                      <span
-                        className="inline-flex items-center gap-1 text-[10px] text-[#F59E0B] bg-[#F59E0B]/10 border border-[#F59E0B]/30 px-2 py-0.5 rounded-full font-medium"
-                        title="Pending sync to Supabase"
-                      >
-                        <Cloud className="w-2.5 h-2.5" />
-                        Pending
-                      </span>
+                    </div>
+
+                    {c.address && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />
+                        <span className="truncate text-[11px]">{c.address}</span>
+                      </div>
                     )}
 
+                    {c.notes && (
+                      <div className="flex items-center gap-2 text-[11px] text-[#8899AA]/80 italic">
+                        <FileText className="w-3 h-3 text-[#38BDF8] shrink-0" />
+                        <span className="truncate">{c.notes}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Orders Count & Metadata row */}
+                  <div className="mt-3 pt-2 border-t border-[#243447]/60 flex items-center justify-between text-[10px] text-[#6A7B8C]">
+                    <span className="flex items-center gap-1.5">
+                      <ShoppingCart className="w-3 h-3 text-[#00C46A]" />
+                      <strong className="text-white font-medium">{totalOrders}</strong>{' '}
+                      {isSwahili ? 'Maagizo' : 'Orders'}
+                    </span>
+                    <span>{new Date(c.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                {/* Bottom Action Bar */}
+                <div
+                  className="pt-2.5 border-t border-[#243447] flex items-center justify-between gap-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => handleOpenActivityHistory(c)}
+                    className="flex items-center gap-1 text-xs text-[#00C46A] hover:text-white font-semibold transition-colors bg-[#00C46A]/10 hover:bg-[#00C46A]/20 px-2.5 py-1 rounded-lg border border-[#00C46A]/30"
+                    title={isSwahili ? 'Tazama Historia ya Maagizo na Shughuli' : 'View customer activity log & orders'}
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    <span>{isSwahili ? 'Historia' : 'Activity History'}</span>
+                  </button>
+
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => handleDelete(c.id, c.name)}
-                      className="text-[#8899AA] hover:text-red-400 p-1 transition-colors"
-                      title={isSwahili ? 'Futa Mteja' : 'Delete Customer'}
+                      onClick={() => onNavigate('forms')}
+                      className="flex items-center gap-1 text-xs text-[#8899AA] hover:text-[#00C46A] transition-colors font-medium"
+                      title={
+                        isSwahili
+                          ? 'Fungua Utafiti wa Kuridhika kwa Wateja katika Google Forms'
+                          : 'Open Customer Satisfaction Survey in Google Forms'
+                      }
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <ClipboardList className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">{isSwahili ? 'Utafiti' : 'Survey'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleCreateOrderForCustomer(c)}
+                      className="flex items-center gap-1 text-xs text-[#0A1A0F] bg-[#00C46A] hover:bg-[#008F50] px-2.5 py-1 rounded-lg font-bold shadow-xs transition-colors"
+                    >
+                      <ShoppingCart className="w-3.5 h-3.5" />
+                      <span>{isSwahili ? 'Agizo' : 'Order'}</span>
                     </button>
                   </div>
                 </div>
-
-                <div className="mt-2 space-y-1 text-xs text-[#8899AA]">
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-3.5 h-3.5 text-[#00C46A] shrink-0" />
-                    <a href={`tel:${c.phone}`} className="hover:underline text-[#D0E8F0] font-mono">
-                      {c.phone}
-                    </a>
-                  </div>
-                  {c.address && (
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />
-                      <span className="truncate">{c.address}</span>
-                    </div>
-                  )}
-                  {c.notes && (
-                    <div className="flex items-center gap-2 text-[11px] text-[#8899AA]/80 italic">
-                      <FileText className="w-3 h-3 text-[#38BDF8] shrink-0" />
-                      <span className="truncate">{c.notes}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Supabase UUID/ID */}
-                <div className="mt-2 pt-2 border-t border-[#243447]/60 flex items-center justify-between text-[10px] text-[#6A7B8C]">
-                  <span className="font-mono truncate max-w-[200px]">ID: {c.id}</span>
-                  <span>{new Date(c.createdAt).toLocaleDateString()}</span>
-                </div>
               </div>
-
-              <div className="pt-2 border-t border-[#243447] flex items-center justify-between">
-                <button
-                  onClick={() => onNavigate('forms')}
-                  className="flex items-center gap-1.5 text-xs text-[#8899AA] hover:text-[#00C46A] transition-colors font-medium"
-                  title={isSwahili ? 'Fungua Utafiti wa Kuridhika kwa Wateja katika Google Forms' : 'Open Customer Satisfaction Survey in Google Forms'}
-                >
-                  <ClipboardList className="w-3.5 h-3.5" />
-                  <span>{isSwahili ? 'Utafiti wa Google' : 'Google Survey'}</span>
-                </button>
-                <button
-                  onClick={() => onNavigate('orders')}
-                  className="flex items-center gap-1.5 text-xs text-[#00C46A] hover:text-white font-semibold"
-                >
-                  <ShoppingCart className="w-3.5 h-3.5" />
-                  <span>{isSwahili ? 'Unda Agizo' : 'Create Order'}</span>
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
+
+      {/* Customer Activity History Sidebar Component */}
+      <CustomerActivitySidebar
+        customer={selectedCustomerForSidebar}
+        isOpen={isSidebarOpen}
+        onClose={() => {
+          setIsSidebarOpen(false);
+          setSelectedCustomerForSidebar(null);
+        }}
+        onCreateOrder={handleCreateOrderForCustomer}
+        onCustomerUpdated={() => {
+          setCustomers(storageService.getCustomers());
+          setOrders(storageService.getOrders());
+        }}
+      />
 
       {/* Supabase Live Logs Viewer Modal */}
       {showLogsModal && (
@@ -622,7 +1067,7 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
         </div>
       )}
 
-      {/* Add Modal */}
+      {/* Add Customer Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#122010] border border-[#3A5068] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
@@ -659,6 +1104,24 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
                   className="w-full bg-[#1A2E1C] border border-[#3A5068] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#00C46A]"
                 />
               </div>
+
+              <div>
+                <label className="text-xs text-[#8899AA] block mb-1">
+                  {isSwahili ? 'Eneo / Wilaya ya Uwasilishaji' : 'Territory / Delivery Zone'}
+                </label>
+                <select
+                  value={territory}
+                  onChange={(e) => setTerritory(e.target.value)}
+                  className="w-full bg-[#1A2E1C] border border-[#3A5068] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#00C46A]"
+                >
+                  {DEFAULT_TERRITORIES.map((t) => (
+                    <option key={t} value={t} className="bg-[#0A1A0F] text-white">
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="text-xs text-[#8899AA] block mb-1">
                   {isSwahili ? 'Nambari ya Simu' : 'Phone Number'}
@@ -671,6 +1134,7 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
                   className="w-full bg-[#1A2E1C] border border-[#3A5068] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#00C46A]"
                 />
               </div>
+
               <div>
                 <label className="text-xs text-[#8899AA] block mb-1">
                   {isSwahili ? 'Anwani ya Uwasilishaji' : 'Physical Delivery Address'}
@@ -683,6 +1147,7 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
                   className="w-full bg-[#1A2E1C] border border-[#3A5068] rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#00C46A]"
                 />
               </div>
+
               <div>
                 <label className="text-xs text-[#8899AA] block mb-1">
                   {isSwahili ? 'Maelezo ya Ziada / Maagizo' : 'Delivery Notes & Cadence'}
@@ -718,4 +1183,3 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
     </div>
   );
 };
-

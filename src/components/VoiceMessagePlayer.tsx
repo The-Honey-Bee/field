@@ -7,7 +7,6 @@ import {
   Volume2,
   VolumeX,
   FastForward,
-  Radio,
   Sliders,
 } from 'lucide-react';
 import { formatAudioDuration } from '../utils/audioUtils';

@@ -45,7 +45,7 @@ import {
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { useLanguage } from '../context/LanguageContext';
-import { User } from 'firebase/auth';
+import { WorkspaceUser as User } from '../services/workspaceAuth';
 
 interface GoogleFormsScreenProps {
   onNavigate?: (view: string) => void;

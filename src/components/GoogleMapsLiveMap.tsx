@@ -22,7 +22,6 @@ import {
   Navigation as NavIcon,
   Compass,
   Layers,
-  Radio,
   RefreshCw,
   Building2,
   Maximize2,
@@ -579,7 +578,7 @@ export const GoogleMapsLiveMap: React.FC<GoogleMapsLiveMapProps> = ({
         <div className="absolute bottom-3 left-3 z-10 bg-[#0A1A0F]/90 backdrop-blur-md p-2.5 rounded-xl border border-[#2A5038] shadow-xl max-w-xs text-[11px] hidden sm:block">
           <div className="flex items-center justify-between gap-4 font-semibold text-white mb-1">
             <span className="flex items-center gap-1.5 text-[#00C46A]">
-              <Radio className="w-3 h-3 animate-pulse" />
+              <Compass className="w-3 h-3 text-[#00C46A]" />
               <span>Google Maps Engine</span>
             </span>
             <span className="text-[10px] text-[#60A5FA] font-mono">
@@ -730,9 +729,9 @@ export const GoogleMapsLiveMap: React.FC<GoogleMapsLiveMapProps> = ({
             disabled={isLocating}
             className="flex items-center gap-1 text-[11px] font-bold text-[#00C46A] hover:text-white bg-[#1A2E1C] px-2.5 py-1.5 rounded-lg border border-[#3A5068]/50 hover:border-[#00C46A] transition-all"
           >
-            <Radio
+            <NavIcon
               className={`w-3.5 h-3.5 ${
-                isGpsBroadcasting ? 'animate-pulse text-[#00C46A]' : ''
+                isGpsBroadcasting ? 'text-[#00C46A]' : ''
               }`}
             />
             <span>{isGpsBroadcasting ? 'GPS Live: On' : 'Broadcast My GPS'}</span>
