@@ -51,15 +51,19 @@ service cloud.firestore {
     // Customer client accounts
     match /customers/{customerId} {
       allow read: if true;
-      allow create, update: if isValidId(customerId);
-      allow delete: if isAdmin();
+      allow create, update, delete: if isValidId(customerId) || isAdmin();
     }
 
     // Water delivery dispatches and orders
     match /orders/{orderId} {
       allow read: if true;
-      allow create, update: if isValidId(orderId);
-      allow delete: if isAdmin();
+      allow create, update, delete: if isValidId(orderId) || isAdmin();
+    }
+
+    // End-of-day reports
+    match /eod_reports/{reportId} {
+      allow read: if true;
+      allow create, update, delete: if isValidId(reportId) || isAdmin();
     }
 
     // Admin authorization roster

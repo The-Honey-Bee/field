@@ -2,7 +2,7 @@
 // Dual-layer durable persistence: IndexedDB primary with automatic localStorage fallback
 
 const DB_NAME = 'zamzam_field_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export interface OfflineSyncQueueItem {
   id: string;
@@ -59,6 +59,14 @@ class OfflineDatabase {
             const queueStore = db.createObjectStore('sync_queue', { keyPath: 'id' });
             queueStore.createIndex('entityType', 'entityType', { unique: false });
             queueStore.createIndex('createdAt', 'createdAt', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('cached_users')) {
+            const userStore = db.createObjectStore('cached_users', { keyPath: 'id' });
+            userStore.createIndex('email', 'email', { unique: false });
+            userStore.createIndex('employeeId', 'employeeId', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('offline_sessions')) {
+            db.createObjectStore('offline_sessions', { keyPath: 'sessionId' });
           }
           if (!db.objectStoreNames.contains('meta')) {
             db.createObjectStore('meta', { keyPath: 'key' });
@@ -124,6 +132,22 @@ class OfflineDatabase {
       console.warn(`[OfflineDB] Failed to getAll from ${storeName}:`, err);
     }
     return [];
+  }
+
+  public async get<T>(storeName: string, id: string): Promise<T | null> {
+    try {
+      const store = await this.getStore(storeName, 'readonly');
+      if (store) {
+        return await new Promise<T | null>((resolve, reject) => {
+          const req = store.get(id);
+          req.onsuccess = () => resolve((req.result as T) || null);
+          req.onerror = () => reject(req.error);
+        });
+      }
+    } catch (err) {
+      console.warn(`[OfflineDB] Failed to get ${id} from ${storeName}:`, err);
+    }
+    return null;
   }
 
   public async delete(storeName: string, id: string): Promise<void> {

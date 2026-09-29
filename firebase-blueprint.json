@@ -54,6 +54,25 @@
         "createdAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["id", "customerName"]
+    },
+    "EodReport": {
+      "title": "EodReport",
+      "description": "Supervisor and field staff daily delivery reconciliation reports",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "staffId": { "type": "string", "maxLength": 64 },
+        "reportDate": { "type": "string", "maxLength": 64 },
+        "totalRevenue": { "type": "number" },
+        "totalDeliveries": { "type": "number" },
+        "deliveredCount": { "type": "number" },
+        "collectedCount": { "type": "number" },
+        "partialCount": { "type": "number" },
+        "fieldNotes": { "type": "string", "maxLength": 1000 },
+        "syncStatus": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "staffId"]
     }
   },
   "firestore": {
@@ -72,6 +91,10 @@
     "/orders/{orderId}": {
       "schema": "Order",
       "description": "Active delivery dispatches and completed sales"
+    },
+    "/eod_reports/{reportId}": {
+      "schema": "EodReport",
+      "description": "Daily delivery and cash reconciliation reports"
     },
     "/admins/{userId}": {
       "schema": "object",

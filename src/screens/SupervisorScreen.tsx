@@ -4,6 +4,8 @@ import { storageService } from '../services/storage';
 import { supabase } from '../lib/supabase';
 import { Order, EodReport, ProofImage } from '../types';
 import { SupervisorLiveMap } from '../components/SupervisorLiveMap';
+import { EditOrderModal } from '../components/EditOrderModal';
+import { EditReportModal } from '../components/EditReportModal';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -20,6 +22,8 @@ import {
   X,
   ZoomIn,
   MapPin,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 
 interface SupervisorScreenProps {
@@ -34,7 +38,18 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
   const [feedback, setFeedback] = useState<string | null>(null);
   const [supervisorPreviewImage, setSupervisorPreviewImage] = useState<ProofImage | null>(null);
 
+  // Supervisor Edit & Delete State
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [isEditOrderOpen, setIsEditOrderOpen] = useState(false);
+  const [editingReport, setEditingReport] = useState<EodReport | null>(null);
+  const [isEditReportOpen, setIsEditReportOpen] = useState(false);
+
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
+
+  const refreshData = () => {
+    setOrders(storageService.getOrders());
+    setReports(storageService.getReports());
+  };
 
   useEffect(() => {
     const loadedOrders = storageService.getOrders();
@@ -107,11 +122,45 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
     setTimeout(() => setFeedback(null), 3000);
   };
 
+  const handleEditOrder = (order: Order) => {
+    setEditingOrder(order);
+    setIsEditOrderOpen(true);
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    const confirmPrompt = isSwahili
+      ? `Je, una uhakika unataka kufuta agizo ${orderId}? Rekodi hii itafutwa kabisa.`
+      : `Are you sure you want to delete order ${orderId}? This cannot be undone.`;
+    if (window.confirm(confirmPrompt)) {
+      await storageService.deleteOrder(orderId);
+      refreshData();
+      setFeedback(isSwahili ? `Agizo ${orderId} limefutwa kabisa.` : `Order ${orderId} deleted permanently.`);
+      setTimeout(() => setFeedback(null), 3000);
+    }
+  };
+
   const handleReviewReport = (reportId: string) => {
     storageService.updateReportStatus(reportId, 'reviewed');
     setReports(storageService.getReports());
     setFeedback(`EOD Report ${reportId} marked as Reviewed & Reconciled`);
     setTimeout(() => setFeedback(null), 3000);
+  };
+
+  const handleEditReport = (report: EodReport) => {
+    setEditingReport(report);
+    setIsEditReportOpen(true);
+  };
+
+  const handleDeleteReport = async (reportId: string) => {
+    const confirmPrompt = isSwahili
+      ? `Je, una uhakika unataka kufuta ripoti ya EOD ${reportId}? Rekodi hii itafutwa kabisa.`
+      : `Are you sure you want to delete EOD report ${reportId}? This action cannot be undone.`;
+    if (window.confirm(confirmPrompt)) {
+      await storageService.deleteReport(reportId);
+      refreshData();
+      setFeedback(isSwahili ? `Ripoti ya EOD ${reportId} imefutwa kabisa.` : `EOD Report ${reportId} deleted permanently.`);
+      setTimeout(() => setFeedback(null), 3000);
+    }
   };
 
   const pendingOrders = orders.filter((o) => o.status === 'pending');
@@ -268,7 +317,7 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-[#243447]">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t sm:border-t-0 pt-3 sm:pt-0 border-[#243447]">
                     <div className="text-left sm:text-right">
                       <div className="text-xs text-[#8899AA]">{isSwahili ? 'Jumla Ndogo' : 'Order Subtotal'}</div>
                       <div className="font-mono font-bold text-white text-base">
@@ -276,28 +325,48 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
                       </div>
                     </div>
 
-                    {isPending ? (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleRejectOrder(order.id)}
-                          className="p-2 rounded-xl bg-red-950/60 hover:bg-red-900 text-red-400 border border-red-800/40"
-                          title={isSwahili ? 'Kataa' : 'Reject'}
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleApproveOrder(order.id)}
-                          className="px-3.5 py-2 rounded-xl bg-[#006B3C] hover:bg-[#008F50] text-white font-bold text-xs flex items-center gap-1.5"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5 text-[#00C46A]" />
-                          <span>{isSwahili ? 'Idhinisha' : 'Approve'}</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-[#8899AA] italic">
-                        {isSwahili ? 'Imekaguliwa' : 'Reviewed'}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        onClick={() => handleEditOrder(order)}
+                        className="px-2.5 py-1.5 rounded-xl bg-[#1A2E1C] hover:bg-[#253D28] text-[#00C46A] border border-[#2A5038] text-xs font-bold flex items-center gap-1 transition"
+                        title={isSwahili ? 'Hariri agizo' : 'Edit order'}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>{isSwahili ? 'Hariri' : 'Edit'}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteOrder(order.id)}
+                        className="p-1.5 rounded-xl bg-red-950/50 hover:bg-red-900/70 text-red-400 border border-red-800/40 text-xs font-bold transition flex items-center gap-1"
+                        title={isSwahili ? 'Futa agizo' : 'Delete order'}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">{isSwahili ? 'Futa' : 'Delete'}</span>
+                      </button>
+
+                      {isPending ? (
+                        <>
+                          <button
+                            onClick={() => handleRejectOrder(order.id)}
+                            className="p-1.5 rounded-xl bg-red-950/60 hover:bg-red-900 text-red-400 border border-red-800/40"
+                            title={isSwahili ? 'Kataa' : 'Reject'}
+                          >
+                            <XCircle className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleApproveOrder(order.id)}
+                            className="px-3 py-1.5 rounded-xl bg-[#006B3C] hover:bg-[#008F50] text-white font-bold text-xs flex items-center gap-1.5"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5 text-[#00C46A]" />
+                            <span>{isSwahili ? 'Idhinisha' : 'Approve'}</span>
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-[11px] text-[#8899AA] italic px-1">
+                          {isSwahili ? 'Imekaguliwa' : 'Reviewed'}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -422,7 +491,25 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
                       </div>
                     )}
 
-                    <div className="flex justify-end pt-1">
+                    <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-[#243447]/60">
+                      <button
+                        onClick={() => handleEditReport(report)}
+                        className="px-2.5 py-1.5 rounded-xl bg-[#1A2E1C] hover:bg-[#253D28] text-[#00C46A] border border-[#2A5038] text-xs font-bold flex items-center gap-1 transition"
+                        title={isSwahili ? 'Hariri ripoti ya EOD' : 'Edit EOD report'}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>{isSwahili ? 'Hariri' : 'Edit'}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteReport(report.id)}
+                        className="px-2.5 py-1.5 rounded-xl bg-red-950/50 hover:bg-red-900/70 text-red-400 border border-red-800/40 text-xs font-bold transition flex items-center gap-1"
+                        title={isSwahili ? 'Futa ripoti hii kabisa' : 'Delete EOD report'}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{isSwahili ? 'Futa' : 'Delete'}</span>
+                      </button>
+
                       {report.syncStatus !== 'reviewed' ? (
                         <button
                           onClick={() => handleReviewReport(report.id)}
@@ -432,7 +519,7 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
                           <span>{isSwahili ? 'Weka Sahihi na Funga Hesabu' : 'Sign-off & Reconcile'}</span>
                         </button>
                       ) : (
-                        <span className="text-xs text-[#00C46A] flex items-center gap-1 font-semibold">
+                        <span className="text-xs text-[#00C46A] flex items-center gap-1 font-semibold px-2 py-1 bg-[#006B3C]/20 rounded-lg">
                           <CheckCircle2 className="w-4 h-4" />
                           <span>{isSwahili ? 'Sahihi ya Msimamizi Imekamilika' : 'Supervisor Sign-Off Completed'}</span>
                         </span>
@@ -577,6 +664,42 @@ export const SupervisorScreen: React.FC<SupervisorScreenProps> = ({ onNavigate }
           </div>
         </div>
       )}
+
+      {/* Supervisor Edit Order Modal */}
+      <EditOrderModal
+        order={editingOrder}
+        isOpen={isEditOrderOpen}
+        onClose={() => {
+          setIsEditOrderOpen(false);
+          setEditingOrder(null);
+        }}
+        onSave={(updated) => {
+          refreshData();
+          setFeedback(isSwahili ? `Agizo ${updated.id} limesasishwa kikamilifu!` : `Order ${updated.id} updated successfully!`);
+          setTimeout(() => setFeedback(null), 3000);
+        }}
+        onDelete={(orderId) => {
+          handleDeleteOrder(orderId);
+        }}
+      />
+
+      {/* Supervisor Edit Report Modal */}
+      <EditReportModal
+        report={editingReport}
+        isOpen={isEditReportOpen}
+        onClose={() => {
+          setIsEditReportOpen(false);
+          setEditingReport(null);
+        }}
+        onSave={(updated) => {
+          refreshData();
+          setFeedback(isSwahili ? `Ripoti ya EOD ${updated.id} imesasishwa!` : `EOD Report ${updated.id} updated successfully!`);
+          setTimeout(() => setFeedback(null), 3000);
+        }}
+        onDelete={(reportId) => {
+          handleDeleteReport(reportId);
+        }}
+      />
     </div>
   );
 };

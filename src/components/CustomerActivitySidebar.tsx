@@ -27,7 +27,10 @@ import {
   Check,
   Send,
   History,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
+import { EditCustomerModal } from './EditCustomerModal';
 
 interface CustomerActivitySidebarProps {
   customer: Customer | null;
@@ -57,14 +60,16 @@ export const CustomerActivitySidebar: React.FC<CustomerActivitySidebarProps> = (
   isOpen,
   onClose,
   onCreateOrder,
+  onCustomerUpdated,
 }) => {
   const { isSwahili } = useLanguage();
-  const { user } = useAuth();
+  const { user, isSupervisor } = useAuth();
 
   const [activeTab, setActiveTab] = useState<TimelineEventType>('all');
   const [orders, setOrders] = useState<Order[]>([]);
   const [interactions, setInteractions] = useState<CustomerInteraction[]>([]);
   const [showLogForm, setShowLogForm] = useState<boolean>(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
 
   // Form state for logging a new interaction
   const [interactionType, setInteractionType] = useState<CustomerInteractionType>('call');
@@ -74,6 +79,27 @@ export const CustomerActivitySidebar: React.FC<CustomerActivitySidebarProps> = (
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [copiedPhone, setCopiedPhone] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handleDeleteCustomer = () => {
+    if (!customer) return;
+    const confirmPrompt = isSwahili
+      ? `Je, una uhakika unataka kufuta mteja "${customer.name}"?`
+      : `Are you sure you want to permanently delete customer "${customer.name}"?`;
+    if (window.confirm(confirmPrompt)) {
+      storageService.deleteCustomer(customer.id);
+      if (onCustomerUpdated) onCustomerUpdated();
+      onClose();
+    }
+  };
+
+  const handleDeleteInteraction = (interactionId: string) => {
+    if (window.confirm(isSwahili ? 'Futa kumbukumbu hii ya shughuli?' : 'Delete this interaction record?')) {
+      storageService.deleteCustomerInteraction(interactionId);
+      loadCustomerHistory();
+      setToastMessage(isSwahili ? 'Shughuli imefutwa' : 'Interaction deleted');
+      setTimeout(() => setToastMessage(null), 2500);
+    }
+  };
 
   // Load orders and interactions whenever the selected customer changes or opens
   useEffect(() => {
@@ -279,13 +305,33 @@ export const CustomerActivitySidebar: React.FC<CustomerActivitySidebarProps> = (
                 </div>
               </div>
 
-              <button
-                onClick={onClose}
-                className="p-2 text-[#8899AA] hover:text-white rounded-xl hover:bg-[#1A2E1C] transition-colors"
-                title={isSwahili ? 'Funga' : 'Close'}
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                {isSupervisor && (
+                  <>
+                    <button
+                      onClick={() => setIsEditModalOpen(true)}
+                      className="p-2 text-[#8899AA] hover:text-[#00C46A] rounded-xl hover:bg-[#1A2E1C] transition-colors"
+                      title={isSwahili ? 'Hariri Mteja' : 'Edit Customer'}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={handleDeleteCustomer}
+                      className="p-2 text-[#8899AA] hover:text-red-400 rounded-xl hover:bg-[#1A2E1C] transition-colors"
+                      title={isSwahili ? 'Futa Mteja' : 'Delete Customer'}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={onClose}
+                  className="p-2 text-[#8899AA] hover:text-white rounded-xl hover:bg-[#1A2E1C] transition-colors"
+                  title={isSwahili ? 'Funga' : 'Close'}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Quick Contact & Info Bar */}
@@ -662,6 +708,15 @@ export const CustomerActivitySidebar: React.FC<CustomerActivitySidebarProps> = (
                                 {item.badge}
                               </span>
                             )}
+                            {!isOrder && isSupervisor && (
+                              <button
+                                onClick={() => handleDeleteInteraction(item.id)}
+                                className="text-[#8899AA] hover:text-red-400 p-1 rounded transition"
+                                title={isSwahili ? 'Futa shughuli hii' : 'Delete interaction'}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -712,6 +767,20 @@ export const CustomerActivitySidebar: React.FC<CustomerActivitySidebarProps> = (
           </div>
         </div>
       </div>
+
+      {/* Edit Customer Modal */}
+      <EditCustomerModal
+        customer={customer}
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSave={() => {
+          if (onCustomerUpdated) onCustomerUpdated();
+          loadCustomerHistory();
+          setToastMessage(isSwahili ? 'Mteja amesasishwa' : 'Customer updated');
+          setTimeout(() => setToastMessage(null), 2500);
+        }}
+        onDelete={handleDeleteCustomer}
+      />
     </div>
   );
 };

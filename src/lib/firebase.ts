@@ -1,20 +1,47 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeFirestore, getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  getFirestore,
+  doc,
+  getDocFromServer,
+} from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase App instance singleton
 export const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize Firestore with auto-detect long polling for seamless proxy and iframe network connectivity
+// Initialize Firestore with persistent local cache for complete offline persistence
+// along with auto-detect long polling for seamless proxy and iframe network connectivity
 const dbId = (firebaseConfig as any).firestoreDatabaseId;
 export const firestoreDb = (() => {
   try {
-    return initializeFirestore(firebaseApp, {
-      experimentalAutoDetectLongPolling: true,
-    }, dbId);
-  } catch {
-    // If instance is already initialized, retrieve it
-    return getFirestore(firebaseApp, dbId);
+    return initializeFirestore(
+      firebaseApp,
+      {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+        experimentalAutoDetectLongPolling: true,
+      },
+      dbId
+    );
+  } catch (err) {
+    try {
+      // Fallback without multi-tab manager if tab restriction is active
+      return initializeFirestore(
+        firebaseApp,
+        {
+          localCache: persistentLocalCache({}),
+          experimentalAutoDetectLongPolling: true,
+        },
+        dbId
+      );
+    } catch {
+      // If instance is already initialized, retrieve it
+      return getFirestore(firebaseApp, dbId);
+    }
   }
 })();
 

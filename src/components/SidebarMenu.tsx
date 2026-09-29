@@ -150,7 +150,6 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
           right: 0,
           width: '100%',
           maxWidth: '440px',
-          height: '100vh',
           height: '100dvh',
           zIndex: 2147483647,
           display: 'flex',

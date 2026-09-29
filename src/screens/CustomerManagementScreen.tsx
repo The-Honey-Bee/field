@@ -3,6 +3,7 @@ import { storageService } from '../services/storage';
 import { Customer, CustomerSyncLogEntry, Order } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { CustomerActivitySidebar } from '../components/CustomerActivitySidebar';
+import { EditCustomerModal } from '../components/EditCustomerModal';
 import {
   Users,
   Search,
@@ -10,6 +11,7 @@ import {
   Phone,
   MapPin,
   Trash2,
+  Pencil,
   ShoppingCart,
   CheckCircle2,
   Building2,
@@ -73,6 +75,15 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
   const [address, setAddress] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  // Supervisor Edit Customer State
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [isEditCustomerOpen, setIsEditCustomerOpen] = useState<boolean>(false);
+
+  const handleEditCustomer = (cust: Customer) => {
+    setEditingCustomer(cust);
+    setIsEditCustomerOpen(true);
+  };
 
   // Supabase Fetch & Log State
   const [isFetching, setIsFetching] = useState<boolean>(false);
@@ -522,7 +533,7 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
               </span>
             </div>
             <p className="text-[11px] text-[#8899AA] mt-0.5">
-              https://jwlvtpnhibtmalfdcmbu.supabase.co/rest/v1/customers
+              https://xpyxzssbrbcoukdpdxjx.supabase.co/rest/v1/customers
             </p>
           </div>
         </div>
@@ -773,6 +784,17 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          handleEditCustomer(c);
+                        }}
+                        className="text-[#8899AA] hover:text-[#00C46A] p-1 transition-colors"
+                        title={isSwahili ? 'Hariri Mteja' : 'Edit Customer'}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           handleDelete(c.id, c.name);
                         }}
                         className="text-[#8899AA] hover:text-red-400 p-1 transition-colors"
@@ -906,7 +928,7 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
                     </span>
                   </h2>
                   <p className="text-[11px] text-[#8899AA]">
-                    Target: https://jwlvtpnhibtmalfdcmbu.supabase.co/rest/v1/customers
+                    Target: https://xpyxzssbrbcoukdpdxjx.supabase.co/rest/v1/customers
                   </p>
                 </div>
               </div>
@@ -1180,6 +1202,27 @@ export const CustomerManagementScreen: React.FC<CustomerManagementScreenProps> =
           </div>
         </div>
       )}
+
+      {/* Supervisor Edit Customer Modal */}
+      <EditCustomerModal
+        customer={editingCustomer}
+        isOpen={isEditCustomerOpen}
+        onClose={() => {
+          setIsEditCustomerOpen(false);
+          setEditingCustomer(null);
+        }}
+        onSave={(updated) => {
+          setCustomers(storageService.getCustomers());
+          if (selectedCustomerForSidebar?.id === updated.id) {
+            setSelectedCustomerForSidebar(updated);
+          }
+          setFeedback(isSwahili ? `Mteja "${updated.name}" amesasishwa kikamilifu!` : `Customer "${updated.name}" updated successfully!`);
+          setTimeout(() => setFeedback(null), 3000);
+        }}
+        onDelete={(id, custName) => {
+          handleDelete(id, custName);
+        }}
+      />
     </div>
   );
 };

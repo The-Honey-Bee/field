@@ -23,6 +23,31 @@ export interface BiometricCredential {
   transports?: string[];
 }
 
+export interface CachedStaffAccount {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: UserRole;
+  employeeId: string;
+  plant?: string;
+  title?: string;
+  passwordHash?: string;
+  pinHash?: string;
+  lastLoginAt: string;
+  isPreset?: boolean;
+}
+
+export interface OfflineAuthSession {
+  id: string;
+  sessionId: string;
+  userId: string;
+  user: UserProfile;
+  authenticatedAt: string;
+  isOfflineSession: boolean;
+  expiresAt?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -154,6 +179,7 @@ export interface ChatMessage {
   audioUrl?: string; // base64 Data URL or audio URI
   audioDuration?: number; // duration in seconds
   voiceCategory?: 'status' | 'delay' | 'arrival' | 'refill' | 'urgent' | 'general';
+  updatedAt?: string;
 }
 
 export interface ActivityLogEntry {

@@ -42,7 +42,7 @@ export const SupabaseStatusModal: React.FC<SupabaseStatusModalProps> = ({ isOpen
   const handleTestKey = async () => {
     if (!customKey.trim() && !statusData?.url) return;
     setIsLoading(true);
-    const targetUrl = customUrl.trim() || statusData?.url || 'https://jwlvtpnhibtmalfdcmbu.supabase.co';
+    const targetUrl = customUrl.trim() || statusData?.url || 'https://xpyxzssbrbcoukdpdxjx.supabase.co';
     const targetKey = customKey.trim();
 
     try {
@@ -139,7 +139,7 @@ export const SupabaseStatusModal: React.FC<SupabaseStatusModalProps> = ({ isOpen
                 <div className="bg-[#162719] p-3 rounded-xl border border-[#2A5038]">
                   <span className="text-[#8899AA] block text-[11px]">Configured Supabase URL</span>
                   <span className="font-mono text-white break-all text-xs">
-                    {statusData?.url || 'https://jwlvtpnhibtmalfdcmbu.supabase.co'}
+                    {statusData?.url || 'https://xpyxzssbrbcoukdpdxjx.supabase.co'}
                   </span>
                 </div>
 

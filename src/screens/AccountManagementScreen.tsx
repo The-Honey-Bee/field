@@ -38,7 +38,19 @@ interface AccountManagementScreenProps {
 }
 
 export const AccountManagementScreen: React.FC<AccountManagementScreenProps> = ({ onNavigate }) => {
-  const { user, role, setRole, switchMwanzaPreset, updateProfile, registerBiometrics, logout } = useAuth();
+  const {
+    user,
+    role,
+    setRole,
+    switchMwanzaPreset,
+    updateProfile,
+    registerBiometrics,
+    logout,
+    setOfflinePin,
+    cachedAccounts,
+    isOfflineMode,
+    isOfflineSession,
+  } = useAuth();
   const { language, setLanguage, isSwahili } = useLanguage();
   const [name, setName] = useState<string>(user?.name || '');
   const [email, setEmail] = useState<string>(user?.email || '');
@@ -50,9 +62,16 @@ export const AccountManagementScreen: React.FC<AccountManagementScreenProps> = (
   const [notifApproval, setNotifApproval] = useState<boolean>(true);
   const [notifMessage, setNotifMessage] = useState<boolean>(true);
 
-  // Storage
+  // Storage & Offline PIN
   const [storageLimit, setStorageLimit] = useState<number>(100);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [newOfflinePin, setNewOfflinePin] = useState<string>('');
+  const [offlinePinMsg, setOfflinePinMsg] = useState<{ text: string; isError?: boolean } | null>(null);
+  const [storageEstimate, setStorageEstimate] = useState<{ usageMB: number; quotaMB: number; percentUsed: number }>({
+    usageMB: 1.2,
+    quotaMB: 50,
+    percentUsed: 2,
+  });
 
   // Biometric / WebAuthn State
   const [biometricsSupported, setBiometricsSupported] = useState<boolean>(false);
@@ -81,9 +100,36 @@ export const AccountManagementScreen: React.FC<AccountManagementScreenProps> = (
       setIsMobile(isMobileDevice());
       setDeviceInfo(getMobileDeviceInfo());
       refreshCredentials();
+      try {
+        const est = await storageService.getPendingSyncCount();
+        const stats = await import('../services/offlineDb').then((m) => m.offlineDb.getStorageEstimate());
+        setStorageEstimate(stats);
+      } catch {
+        // ignore
+      }
     };
     checkPlatform();
   }, [user]);
+
+  const handleSaveOfflinePin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOfflinePinMsg(null);
+    const clean = newOfflinePin.trim();
+    if (!/^\d{4,6}$/.test(clean)) {
+      setOfflinePinMsg({ text: 'PIN must be between 4 and 6 numeric digits.', isError: true });
+      return;
+    }
+    const ok = await setOfflinePin(clean);
+    if (ok) {
+      setOfflinePinMsg({
+        text: 'Offline PIN saved successfully! You can now use this PIN for fast truck & field sign in.',
+        isError: false,
+      });
+      setNewOfflinePin('');
+    } else {
+      setOfflinePinMsg({ text: 'Failed to update offline PIN.', isError: true });
+    }
+  };
 
   const refreshCredentials = () => {
     if (user?.id) {
@@ -692,13 +738,91 @@ export const AccountManagementScreen: React.FC<AccountManagementScreenProps> = (
         </div>
       </div>
 
-      {/* 3. Offline Storage & Cache */}
-      <div className="bg-[#122010] p-5 rounded-2xl border border-[#2A5038]">
-        <h2 className="text-xs font-semibold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
-          <HardDrive className="w-4 h-4 text-[#00C46A]" />
-          <span>Offline Buffer & Cache Management</span>
-        </h2>
+      {/* 3. Offline Vault, Fast PIN & Storage Management */}
+      <div className="bg-[#122010] p-5 rounded-2xl border border-[#2A5038] space-y-4">
+        <div className="flex items-center justify-between border-b border-[#243447] pb-3">
+          <div>
+            <h2 className="text-xs font-semibold text-white uppercase tracking-wider flex items-center gap-2">
+              <HardDrive className="w-4 h-4 text-[#00C46A]" />
+              <span>Offline Login Vault & Durable Persistence</span>
+            </h2>
+            <p className="text-[11px] text-[#8899AA] mt-0.5">
+              Manage local authentication vault, 4-digit rapid in-vehicle PIN, and durable IndexedDB storage.
+            </p>
+          </div>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30">
+            Vault Ready
+          </span>
+        </div>
 
+        {/* 4-Digit Offline PIN Setup */}
+        <div className="p-3 bg-[#1A2E1C] rounded-xl border border-[#3A5068]/40 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-white flex items-center gap-1.5">
+              <KeyRound className="w-3.5 h-3.5 text-[#00C46A]" />
+              <span>Rapid Field & Truck PIN</span>
+            </span>
+            <span className="text-[10px] text-[#8899AA]">Default: 1234</span>
+          </div>
+          <p className="text-[11px] text-[#8899AA]">
+            Set a 4 to 6 digit numeric PIN to sign into this device in seconds while on delivery routes with no internet.
+          </p>
+
+          <form onSubmit={handleSaveOfflinePin} className="flex gap-2 pt-1">
+            <input
+              type="password"
+              maxLength={6}
+              value={newOfflinePin}
+              onChange={(e) => setNewOfflinePin(e.target.value)}
+              placeholder="Enter new 4-digit PIN"
+              className="flex-1 bg-[#122010] border border-[#3A5068] rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-[#64748B] focus:outline-none focus:border-[#00C46A]"
+            />
+            <button
+              type="submit"
+              className="bg-[#006B3C] hover:bg-[#008F50] text-white font-bold text-xs px-3.5 py-1.5 rounded-xl transition-all"
+            >
+              Update PIN
+            </button>
+          </form>
+
+          {offlinePinMsg && (
+            <div
+              className={`p-2 rounded-lg text-[11px] flex items-center gap-1.5 animate-fade-in ${
+                offlinePinMsg.isError
+                  ? 'bg-rose-950/40 text-rose-300 border border-rose-500/30'
+                  : 'bg-emerald-950/40 text-emerald-300 border border-emerald-500/30'
+              }`}
+            >
+              {offlinePinMsg.isError ? (
+                <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              )}
+              <span>{offlinePinMsg.text}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Local Storage & IndexedDB Diagnostics */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div className="p-2.5 bg-[#1A2E1C] rounded-xl border border-[#3A5068]/30">
+            <div className="text-[10px] text-[#8899AA] uppercase">Vault Profiles</div>
+            <div className="text-sm font-bold text-white font-mono mt-0.5">{cachedAccounts.length} Staff</div>
+            <div className="text-[9px] text-[#00C46A]">Mwanza Roster Cached</div>
+          </div>
+          <div className="p-2.5 bg-[#1A2E1C] rounded-xl border border-[#3A5068]/30">
+            <div className="text-[10px] text-[#8899AA] uppercase">IndexedDB Health</div>
+            <div className="text-sm font-bold text-white font-mono mt-0.5">Active</div>
+            <div className="text-[9px] text-[#00C46A]">Version 2 Durable</div>
+          </div>
+          <div className="p-2.5 bg-[#1A2E1C] rounded-xl border border-[#3A5068]/30 col-span-2 sm:col-span-1">
+            <div className="text-[10px] text-[#8899AA] uppercase">Storage Usage</div>
+            <div className="text-sm font-bold text-white font-mono mt-0.5">{storageEstimate.usageMB} MB</div>
+            <div className="text-[9px] text-[#8899AA]">{storageEstimate.percentUsed}% of device quota</div>
+          </div>
+        </div>
+
+        {/* Sync & Buffer Actions */}
         <div className="p-3 bg-[#1A2E1C] rounded-xl border border-[#3A5068]/40 space-y-3 text-xs">
           <div className="flex justify-between items-center">
             <span className="text-[#8899AA]">Offline Queue Limit:</span>

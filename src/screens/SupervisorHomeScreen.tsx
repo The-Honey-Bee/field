@@ -4,6 +4,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { storageService } from '../services/storage';
 import { Order, EodReport, ProofImage } from '../types';
 import { SupervisorLiveMap } from '../components/SupervisorLiveMap';
+import { EditOrderModal } from '../components/EditOrderModal';
+import { EditReportModal } from '../components/EditReportModal';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -21,6 +23,8 @@ import {
   RefreshCw,
   Bell,
   Check,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 
 interface SupervisorHomeScreenProps {
@@ -35,6 +39,12 @@ export const SupervisorHomeScreen: React.FC<SupervisorHomeScreenProps> = ({ onNa
   const [reports, setReports] = useState<EodReport[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [selectedProofImage, setSelectedProofImage] = useState<ProofImage | null>(null);
+
+  // Supervisor Edit & Delete State
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [isEditOrderOpen, setIsEditOrderOpen] = useState(false);
+  const [editingReport, setEditingReport] = useState<EodReport | null>(null);
+  const [isEditReportOpen, setIsEditReportOpen] = useState(false);
 
   const loadData = () => {
     setOrders(storageService.getOrders());
@@ -66,11 +76,45 @@ export const SupervisorHomeScreen: React.FC<SupervisorHomeScreenProps> = ({ onNa
     setTimeout(() => setFeedback(null), 3000);
   };
 
+  const handleEditOrder = (order: Order) => {
+    setEditingOrder(order);
+    setIsEditOrderOpen(true);
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    const confirmPrompt = isSwahili
+      ? `Je, una uhakika unataka kufuta agizo ${orderId}? Hatua hii haiwezi kutenduliwa.`
+      : `Are you sure you want to delete order ${orderId}? This cannot be undone.`;
+    if (window.confirm(confirmPrompt)) {
+      await storageService.deleteOrder(orderId);
+      loadData();
+      setFeedback(isSwahili ? `Agizo ${orderId} limefutwa kabisa.` : `Order ${orderId} deleted permanently.`);
+      setTimeout(() => setFeedback(null), 3000);
+    }
+  };
+
   const handleApproveReport = (reportId: string) => {
     storageService.updateReportStatus(reportId, 'reviewed');
     loadData();
     setFeedback(isSwahili ? `Ripoti ya EOD ${reportId} imethibitishwa.` : `EOD Report ${reportId} marked as verified.`);
     setTimeout(() => setFeedback(null), 3000);
+  };
+
+  const handleEditReport = (report: EodReport) => {
+    setEditingReport(report);
+    setIsEditReportOpen(true);
+  };
+
+  const handleDeleteReport = async (reportId: string) => {
+    const confirmPrompt = isSwahili
+      ? `Je, una uhakika unataka kufuta ripoti ya EOD ${reportId}? Hatua hii itafuta ripoti hii kabisa.`
+      : `Are you sure you want to delete EOD report ${reportId}? This action cannot be undone.`;
+    if (window.confirm(confirmPrompt)) {
+      await storageService.deleteReport(reportId);
+      loadData();
+      setFeedback(isSwahili ? `Ripoti ya EOD ${reportId} imefutwa kabisa.` : `EOD Report ${reportId} deleted permanently.`);
+      setTimeout(() => setFeedback(null), 3000);
+    }
   };
 
   return (
@@ -340,17 +384,33 @@ export const SupervisorHomeScreen: React.FC<SupervisorHomeScreenProps> = ({ onNa
                         <span className="text-[11px] text-[#8899AA]">
                           {isSwahili ? 'Mfanyakazi' : 'Staff'}: <span className="text-white font-mono">{order.staffId || 'ZZ-FIELD'}</span>
                         </span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleEditOrder(order)}
+                            className="px-2.5 py-1 bg-[#1A2E1C] hover:bg-[#253D28] text-[#00C46A] border border-[#2A5038] rounded-lg text-xs font-bold transition flex items-center gap-1"
+                            title={isSwahili ? 'Hariri agizo' : 'Edit order'}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">{isSwahili ? 'Hariri' : 'Edit'}</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteOrder(order.id)}
+                            className="px-2.5 py-1 bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-800/40 rounded-lg text-xs font-bold transition flex items-center gap-1"
+                            title={isSwahili ? 'Futa agizo' : 'Delete order'}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">{isSwahili ? 'Futa' : 'Delete'}</span>
+                          </button>
                           <button
                             onClick={() => handleRejectOrder(order.id)}
-                            className="px-3 py-1 bg-red-900/30 hover:bg-red-900/50 text-red-300 border border-red-800/40 rounded-lg text-xs font-bold transition flex items-center gap-1"
+                            className="px-2.5 py-1 bg-red-900/30 hover:bg-red-900/50 text-red-300 border border-red-800/40 rounded-lg text-xs font-bold transition flex items-center gap-1"
                           >
                             <XCircle className="w-3.5 h-3.5" />
                             <span>{isSwahili ? 'Kataa' : 'Reject'}</span>
                           </button>
                           <button
                             onClick={() => handleApproveOrder(order.id)}
-                            className="px-3.5 py-1 bg-[#006B3C] hover:bg-[#008A4D] text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                            className="px-3 py-1 bg-[#006B3C] hover:bg-[#008A4D] text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
                           >
                             <Check className="w-3.5 h-3.5" />
                             <span>{isSwahili ? 'Idhinisha' : 'Approve'}</span>
@@ -474,29 +534,49 @@ export const SupervisorHomeScreen: React.FC<SupervisorHomeScreenProps> = ({ onNa
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#1A2E1C]/60">
                     <span className="text-xs text-[#8899AA]">
                       {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} &bull; Staff: {order.staffId || 'ZZ-FIELD'}
                     </span>
 
-                    {order.status === 'pending' && (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleRejectOrder(order.id)}
-                          className="px-3 py-1 bg-red-900/30 hover:bg-red-900/50 text-red-300 border border-red-800/40 rounded-lg text-xs font-bold transition flex items-center gap-1"
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                          <span>{isSwahili ? 'Kataa' : 'Reject'}</span>
-                        </button>
-                        <button
-                          onClick={() => handleApproveOrder(order.id)}
-                          className="px-4 py-1 bg-[#006B3C] hover:bg-[#008A4D] text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>{isSwahili ? 'Idhinisha' : 'Authorize Order'}</span>
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleEditOrder(order)}
+                        className="px-2.5 py-1 bg-[#1A2E1C] hover:bg-[#253D28] text-[#00C46A] border border-[#2A5038] rounded-lg text-xs font-bold transition flex items-center gap-1"
+                        title={isSwahili ? 'Hariri agizo hili' : 'Edit this order'}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>{isSwahili ? 'Hariri' : 'Edit'}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteOrder(order.id)}
+                        className="px-2.5 py-1 bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-800/40 rounded-lg text-xs font-bold transition flex items-center gap-1"
+                        title={isSwahili ? 'Futa agizo hili kabisa' : 'Delete this order'}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{isSwahili ? 'Futa' : 'Delete'}</span>
+                      </button>
+
+                      {order.status === 'pending' && (
+                        <>
+                          <button
+                            onClick={() => handleRejectOrder(order.id)}
+                            className="px-2.5 py-1 bg-red-900/30 hover:bg-red-900/50 text-red-300 border border-red-800/40 rounded-lg text-xs font-bold transition flex items-center gap-1"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>{isSwahili ? 'Kataa' : 'Reject'}</span>
+                          </button>
+                          <button
+                            onClick={() => handleApproveOrder(order.id)}
+                            className="px-3.5 py-1 bg-[#006B3C] hover:bg-[#008A4D] text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>{isSwahili ? 'Idhinisha' : 'Authorize'}</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -569,19 +649,40 @@ export const SupervisorHomeScreen: React.FC<SupervisorHomeScreenProps> = ({ onNa
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between pt-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#1A2E1C]/60">
                     <span className="text-xs text-[#8899AA]">
-                      {new Date(report.reportDate || report.createdAt).toLocaleDateString()}
+                      {new Date(report.reportDate || report.createdAt).toLocaleDateString()} &bull; Staff: {report.staffId}
                     </span>
-                    {report.syncStatus !== 'reviewed' && (
+
+                    <div className="flex items-center gap-1.5">
                       <button
-                        onClick={() => handleApproveReport(report.id)}
-                        className="px-3.5 py-1.5 bg-[#006B3C] hover:bg-[#008A4D] text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                        onClick={() => handleEditReport(report)}
+                        className="px-2.5 py-1 bg-[#1A2E1C] hover:bg-[#253D28] text-[#00C46A] border border-[#2A5038] rounded-lg text-xs font-bold transition flex items-center gap-1"
+                        title={isSwahili ? 'Hariri ripoti hii ya EOD' : 'Edit this EOD report'}
                       >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>{isSwahili ? 'Thibitisha na Weka Sahihi' : 'Verify & Sign-off'}</span>
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>{isSwahili ? 'Hariri' : 'Edit'}</span>
                       </button>
-                    )}
+
+                      <button
+                        onClick={() => handleDeleteReport(report.id)}
+                        className="px-2.5 py-1 bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-800/40 rounded-lg text-xs font-bold transition flex items-center gap-1"
+                        title={isSwahili ? 'Futa ripoti hii kabisa' : 'Delete this EOD report'}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{isSwahili ? 'Futa' : 'Delete'}</span>
+                      </button>
+
+                      {report.syncStatus !== 'reviewed' && (
+                        <button
+                          onClick={() => handleApproveReport(report.id)}
+                          className="px-3.5 py-1 bg-[#006B3C] hover:bg-[#008A4D] text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>{isSwahili ? 'Thibitisha na Weka Sahihi' : 'Verify & Sign-off'}</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -605,6 +706,42 @@ export const SupervisorHomeScreen: React.FC<SupervisorHomeScreenProps> = ({ onNa
           </div>
         </div>
       )}
+
+      {/* Supervisor Edit Order Modal */}
+      <EditOrderModal
+        order={editingOrder}
+        isOpen={isEditOrderOpen}
+        onClose={() => {
+          setIsEditOrderOpen(false);
+          setEditingOrder(null);
+        }}
+        onSave={(updated) => {
+          loadData();
+          setFeedback(isSwahili ? `Agizo ${updated.id} limesasishwa kikamilifu!` : `Order ${updated.id} updated successfully!`);
+          setTimeout(() => setFeedback(null), 3000);
+        }}
+        onDelete={(orderId) => {
+          handleDeleteOrder(orderId);
+        }}
+      />
+
+      {/* Supervisor Edit Report Modal */}
+      <EditReportModal
+        report={editingReport}
+        isOpen={isEditReportOpen}
+        onClose={() => {
+          setIsEditReportOpen(false);
+          setEditingReport(null);
+        }}
+        onSave={(updated) => {
+          loadData();
+          setFeedback(isSwahili ? `Ripoti ya EOD ${updated.id} imesasishwa!` : `EOD Report ${updated.id} updated successfully!`);
+          setTimeout(() => setFeedback(null), 3000);
+        }}
+        onDelete={(reportId) => {
+          handleDeleteReport(reportId);
+        }}
+      />
     </div>
   );
 };

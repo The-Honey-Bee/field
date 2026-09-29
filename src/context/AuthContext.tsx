@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { UserProfile, UserRole, BiometricCredential } from '../types';
+import { UserProfile, UserRole, BiometricCredential, CachedStaffAccount } from '../types';
 import { supabase } from '../lib/supabase';
 import { webAuthnService } from '../services/webauthn';
+import { offlineAuthService } from '../services/offlineAuth';
 
 export const MWANZA_PLANT_ROSTER: Record<'supervisor' | 'dispatcher' | 'manager' | 'field_staff', UserProfile> = {
   supervisor: {
@@ -55,7 +56,14 @@ interface AuthContextType {
   isDispatcher: boolean;
   isSupervisor: boolean;
   isManager: boolean;
+  isOfflineMode: boolean;
+  isOfflineSession: boolean;
+  cachedAccounts: CachedStaffAccount[];
+  refreshCachedAccounts: () => Promise<void>;
   login: (email: string, password?: string, role?: UserRole) => Promise<{ success: boolean; error?: string }>;
+  loginOffline: (identifier: string, passwordOrPin: string) => Promise<{ success: boolean; error?: string }>;
+  quickOfflineLogin: (userId: string, pin?: string) => Promise<{ success: boolean; error?: string }>;
+  setOfflinePin: (pin: string) => Promise<boolean>;
   loginWithBiometrics: (targetEmail?: string) => Promise<{ success: boolean; error?: string }>;
   registerBiometrics: (deviceLabel?: string) => Promise<{ success: boolean; credential?: BiometricCredential; error?: string }>;
   signUp: (name: string, email: string, phone: string, password?: string, role?: UserRole) => Promise<{ success: boolean; error?: string }>;
@@ -71,13 +79,26 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const LOCAL_STORAGE_USER_KEY = 'zamzam_authenticated_user';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isOfflineSession, setIsOfflineSession] = useState<boolean>(() => {
+    return offlineAuthService.getPersistedSession()?.isOffline ?? false;
+  });
+
+  const [isOfflineMode, setIsOfflineMode] = useState<boolean>(() => {
+    return typeof navigator !== 'undefined' ? !navigator.onLine : false;
+  });
+
+  const [cachedAccounts, setCachedAccounts] = useState<CachedStaffAccount[]>([]);
+
   const [user, setUser] = useState<UserProfile | null>(() => {
     // Check if user was previously authenticated and saved
     try {
+      const persisted = offlineAuthService.getPersistedSession();
+      if (persisted && persisted.user && persisted.user.id) {
+        return persisted.user;
+      }
       const saved = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Only return if valid user structure
         if (parsed && parsed.id && parsed.email) {
           return {
             ...parsed,
@@ -94,6 +115,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Monitor network online/offline events
+  useEffect(() => {
+    const handleOnline = () => setIsOfflineMode(false);
+    const handleOffline = () => setIsOfflineMode(true);
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      }
+    };
+  }, []);
+
+  // Hydrate cached accounts from local vault
+  const refreshCachedAccounts = useCallback(async () => {
+    try {
+      const accounts = await offlineAuthService.getCachedAccounts();
+      setCachedAccounts(accounts);
+    } catch (err) {
+      console.warn('Failed to refresh cached accounts:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshCachedAccounts();
+  }, [refreshCachedAccounts]);
 
   // Fetch or upsert profile in Supabase database
   const syncUserProfileFromDatabase = useCallback(async (userId: string, email?: string, metadata?: any): Promise<UserProfile | null> => {
@@ -232,7 +284,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const role: UserRole = user?.role || 'field_staff';
 
-  // Login implementation with Supabase Auth and database sync
+  // Login implementation with Supabase Auth and database sync, with resilient offline fallback
   const login = async (
     email: string,
     password?: string,
@@ -243,8 +295,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const pwd = password || '123456';
     const targetRole = specifiedRole || 'field_staff';
 
+    // 0. If explicitly offline, perform immediate offline vault authentication
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const offlineRes = await offlineAuthService.authenticateOffline(email, pwd);
+      if (offlineRes.success && offlineRes.user) {
+        setUser(offlineRes.user);
+        setIsOfflineSession(true);
+        offlineAuthService.savePersistedSession(offlineRes.user, true);
+        await refreshCachedAccounts();
+        setLoading(false);
+        return { success: true };
+      } else {
+        const errMsg = offlineRes.error || 'Offline credentials verification failed.';
+        setError(errMsg);
+        setLoading(false);
+        return { success: false, error: errMsg };
+      }
+    }
+
     try {
-      // 1. Authenticate with Supabase Auth
+      // 1. Authenticate with Supabase Auth when online
       const { data, error: authErr } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: pwd,
@@ -268,42 +338,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
 
         setUser(authenticatedProfile);
+        setIsOfflineSession(false);
+        // Securely cache account into local vault for future offline logins
+        await offlineAuthService.cacheAccount(authenticatedProfile, pwd);
+        offlineAuthService.savePersistedSession(authenticatedProfile, false);
+        await refreshCachedAccounts();
         setLoading(false);
         return { success: true };
       }
 
-      // If remote Supabase rejected with invalid API key or credentials, check fallback
+      // If remote Supabase rejected with network error or invalid API key or connection timeout
       if (authErr) {
-        // Check if error is due to remote project credential or invalid credentials
-        const msg = authErr.message || 'Authentication failed';
-
-        // Provide offline fallback session if field staff credentials provided
-        if (email.trim().length > 3) {
-          const lower = email.toLowerCase().trim();
-          let fallbackUser: UserProfile;
-          if (lower.includes('noah') || lower.includes('philemon')) {
-            fallbackUser = MWANZA_PLANT_ROSTER.supervisor;
-          } else if (lower.includes('grace') || lower.includes('matiku')) {
-            fallbackUser = MWANZA_PLANT_ROSTER.dispatcher;
-          } else if (lower.includes('aaliyah') || lower.includes('salehe')) {
-            fallbackUser = MWANZA_PLANT_ROSTER.manager;
-          } else {
-            fallbackUser = {
-              id: 'usr-' + btoa(email.trim()).replace(/=/g, '').slice(0, 8),
-              name: email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-              email: email.trim(),
-              phone: '+255 7' + Math.floor(10000000 + Math.random() * 90000000),
-              role: targetRole,
-              employeeId: `ZZ-MWZ-${Math.floor(1000 + Math.random() * 9000)}`,
-              plant: 'Mwanza Plant',
-            };
-          }
-
-          setUser(fallbackUser);
+        // Check offline vault first before failing
+        const offlineRes = await offlineAuthService.authenticateOffline(email, pwd);
+        if (offlineRes.success && offlineRes.user) {
+          setUser(offlineRes.user);
+          setIsOfflineSession(true);
+          offlineAuthService.savePersistedSession(offlineRes.user, true);
+          await refreshCachedAccounts();
           setLoading(false);
           return { success: true };
         }
 
+        const msg = authErr.message || 'Authentication failed';
         setError(msg);
         setLoading(false);
         return { success: false, error: msg };
@@ -312,25 +369,90 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
       return { success: true };
     } catch (err: any) {
-      // Offline fallback
-      if (email.trim().length > 3) {
-        const fallbackUser: UserProfile = {
-          id: 'usr-' + Date.now().toString(36),
-          name: email.split('@')[0],
-          email: email.trim(),
-          phone: '',
-          role: targetRole,
-          employeeId: `ZZ-${Math.floor(1000 + Math.random() * 9000)}`,
-        };
-        setUser(fallbackUser);
+      // Network failure or unreachable backend: fallback to offline vault
+      const offlineRes = await offlineAuthService.authenticateOffline(email, pwd);
+      if (offlineRes.success && offlineRes.user) {
+        setUser(offlineRes.user);
+        setIsOfflineSession(true);
+        offlineAuthService.savePersistedSession(offlineRes.user, true);
+        await refreshCachedAccounts();
         setLoading(false);
         return { success: true };
       }
+
       const errMsg = err?.message || 'Network error during sign in';
       setError(errMsg);
       setLoading(false);
       return { success: false, error: errMsg };
     }
+  };
+
+  // Explicit offline authentication method
+  const loginOffline = async (
+    identifier: string,
+    passwordOrPin: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await offlineAuthService.authenticateOffline(identifier, passwordOrPin);
+      if (res.success && res.user) {
+        setUser(res.user);
+        setIsOfflineSession(true);
+        offlineAuthService.savePersistedSession(res.user, true);
+        await refreshCachedAccounts();
+        setLoading(false);
+        return { success: true };
+      }
+      const err = res.error || 'Offline login failed';
+      setError(err);
+      setLoading(false);
+      return { success: false, error: err };
+    } catch (err: any) {
+      const msg = err?.message || 'Offline authentication error';
+      setError(msg);
+      setLoading(false);
+      return { success: false, error: msg };
+    }
+  };
+
+  // Quick 1-tap/PIN offline login from cached staff roster
+  const quickOfflineLogin = async (
+    userId: string,
+    pin?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await offlineAuthService.quickLoginOffline(userId, pin);
+      if (res.success && res.user) {
+        setUser(res.user);
+        setIsOfflineSession(true);
+        offlineAuthService.savePersistedSession(res.user, true);
+        await refreshCachedAccounts();
+        setLoading(false);
+        return { success: true };
+      }
+      const err = res.error || 'Quick offline login failed';
+      setError(err);
+      setLoading(false);
+      return { success: false, error: err };
+    } catch (err: any) {
+      const msg = err?.message || 'Quick login error';
+      setError(msg);
+      setLoading(false);
+      return { success: false, error: msg };
+    }
+  };
+
+  // Set offline 4-digit PIN for rapid field login
+  const setOfflinePin = async (pin: string): Promise<boolean> => {
+    if (!user) return false;
+    const ok = await offlineAuthService.setOfflinePin(user.id, pin);
+    if (ok) {
+      await refreshCachedAccounts();
+    }
+    return ok;
   };
 
   // Biometric / WebAuthn Sign In
@@ -503,15 +625,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Fast switch to official Mwanza Plant roster members
-  const switchMwanzaPreset = (presetKey: 'supervisor' | 'dispatcher' | 'manager' | 'field_staff') => {
+  const switchMwanzaPreset = async (presetKey: 'supervisor' | 'dispatcher' | 'manager' | 'field_staff') => {
     const selected = MWANZA_PLANT_ROSTER[presetKey];
     if (selected) {
       setUser(selected);
       localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(selected));
+      await offlineAuthService.cacheAccount(selected, '123456', '1234');
+      offlineAuthService.savePersistedSession(selected, isOfflineMode);
+      await refreshCachedAccounts();
     }
   };
 
-  // Sign out from Supabase Auth and clear local session
+  // Sign out from Supabase Auth and clear local session while preserving offline account vault
   const logout = async () => {
     try {
       await supabase.auth.signOut();
@@ -519,6 +644,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Sign out notice:', err);
     } finally {
       setUser(null);
+      setIsOfflineSession(false);
+      offlineAuthService.clearPersistedSession();
       localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
       localStorage.removeItem('zamzam_current_user');
     }
@@ -537,7 +664,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isDispatcher: role === 'dispatcher' || role === 'supervisor' || role === 'manager',
         isSupervisor: role === 'supervisor' || role === 'manager',
         isManager: role === 'manager',
+        isOfflineMode,
+        isOfflineSession,
+        cachedAccounts,
+        refreshCachedAccounts,
         login,
+        loginOffline,
+        quickOfflineLogin,
+        setOfflinePin,
         loginWithBiometrics,
         registerBiometrics,
         signUp,

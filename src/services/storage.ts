@@ -12,6 +12,8 @@ import {
   BiometricCredential,
 } from '../types';
 import { supabase } from '../lib/supabase';
+import { firestoreDb } from '../lib/firebase';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { offlineDb } from './offlineDb';
 import { requestBackgroundSync } from './serviceWorkerRegistration';
 
@@ -256,7 +258,7 @@ class StorageService {
     }
   }
 
-  // --- Products Catalog (Supabase Table: https://jwlvtpnhibtmalfdcmbu.supabase.co/rest/v1/products) ---
+  // --- Products Catalog (Supabase Table: https://xpyxzssbrbcoukdpdxjx.supabase.co/rest/v1/products) ---
   public getProducts(): Product[] {
     const enforceStandard18Price = (list: Product[]) =>
       list.map((p) => {
@@ -309,7 +311,7 @@ class StorageService {
       console.warn('[Storage] Direct Supabase product query fallback:', err);
     }
 
-    // 2. Try proxy endpoint /api/products which connects to https://jwlvtpnhibtmalfdcmbu.supabase.co/rest/v1/products
+    // 2. Try proxy endpoint /api/products which connects to https://xpyxzssbrbcoukdpdxjx.supabase.co/rest/v1/products
     try {
       const res = await fetch('/api/products');
       if (res.ok) {
@@ -427,7 +429,7 @@ class StorageService {
   public async fetchAndLogCustomersFromSupabase(): Promise<Customer[]> {
     console.group('%c[Supabase:customers] 📡 Fetching Customer List from "customers" Table', 'color: #00C46A; font-weight: bold; font-size: 13px;');
     console.log('[Supabase:customers] Target Table: "customers"');
-    console.log('[Supabase:customers] Remote Endpoint: https://jwlvtpnhibtmalfdcmbu.supabase.co/rest/v1/customers?select=*&order=created_at.desc');
+    console.log('[Supabase:customers] Remote Endpoint: https://xpyxzssbrbcoukdpdxjx.supabase.co/rest/v1/customers?select=*&order=created_at.desc');
     console.log('[Supabase:customers] Query Timestamp:', new Date().toISOString());
 
     this.appendCustomerLog({
@@ -781,10 +783,100 @@ class StorageService {
     return newCustomer;
   }
 
-  public deleteCustomer(id: string) {
+  public async updateCustomer(id: string, updatedData: Partial<Customer>): Promise<Customer | null> {
+    const customers = this.getCustomers();
+    const index = customers.findIndex((c) => c.id === id);
+    if (index === -1) return null;
+
+    const existing = customers[index];
+    const updated: Customer = {
+      ...existing,
+      ...updatedData,
+      id: existing.id,
+      syncStatus: this.isOnlineStatus ? 'synced' : 'pending',
+    };
+
+    customers[index] = updated;
+    localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
+    await offlineDb.put('customers', updated);
+
+    this.addActivityLog({
+      action: 'customer_updated_by_supervisor',
+      entityType: 'customer',
+      entityId: id,
+      description: `Customer "${updated.name}" updated by supervisor`,
+      status: 'success',
+    });
+
+    if (this.isOnlineStatus) {
+      try {
+        await supabase
+          .from('customers')
+          .update({
+            name: updated.name,
+            phone: updated.phone,
+            address: updated.address || '',
+            notes: updated.notes || '',
+          })
+          .eq('id', id);
+      } catch (err) {
+        console.warn('Supabase customer update error:', err);
+      }
+      try {
+        await setDoc(
+          doc(firestoreDb, 'customers', id),
+          {
+            id: updated.id,
+            name: updated.name,
+            phone: updated.phone || '',
+            address: updated.address || '',
+            notes: updated.notes || '',
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      } catch {
+        // ignore
+      }
+    } else {
+      await offlineDb.enqueue({
+        id: updated.id,
+        entityType: 'customer',
+        action: 'update',
+        data: updated,
+      });
+    }
+
+    return updated;
+  }
+
+  public async deleteCustomer(id: string): Promise<boolean> {
     const customers = this.getCustomers().filter((c) => c.id !== id);
     localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
-    offlineDb.delete('customers', id);
+    await offlineDb.delete('customers', id);
+    await offlineDb.removeQueueItem(id);
+
+    this.addActivityLog({
+      action: 'customer_deleted_by_supervisor',
+      entityType: 'customer',
+      entityId: id,
+      description: `Customer ${id} was deleted by supervisor`,
+      status: 'warning',
+    });
+
+    if (this.isOnlineStatus) {
+      try {
+        await supabase.from('customers').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Supabase customer delete error:', err);
+      }
+      try {
+        await deleteDoc(doc(firestoreDb, 'customers', id));
+      } catch {
+        // ignore
+      }
+    }
+    return true;
   }
 
   // --- Customer Interactions & History ---
@@ -837,6 +929,29 @@ class StorageService {
     });
 
     return fullInteraction;
+  }
+
+  public deleteCustomerInteraction(interactionId: string): boolean {
+    const list = this.getCustomerInteractions().filter((i) => i.id !== interactionId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.INTERACTIONS, JSON.stringify(list));
+    }
+    return true;
+  }
+
+  public updateCustomerInteraction(
+    interactionId: string,
+    updatedData: Partial<CustomerInteraction>
+  ): CustomerInteraction | null {
+    const list = this.getCustomerInteractions();
+    const idx = list.findIndex((i) => i.id === interactionId);
+    if (idx === -1) return null;
+    const updated = { ...list[idx], ...updatedData, id: list[idx].id };
+    list[idx] = updated;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.INTERACTIONS, JSON.stringify(list));
+    }
+    return updated;
   }
 
   public getCustomerOrders(customerId: string, customerName: string): Order[] {
@@ -961,6 +1076,7 @@ class StorageService {
     if (order) {
       order.status = status;
       localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
+      offlineDb.put('orders', order);
       this.addActivityLog({
         action: status === 'approved' ? 'order_approved' : 'order_rejected',
         entityType: 'order',
@@ -970,8 +1086,108 @@ class StorageService {
       });
       if (this.isOnlineStatus) {
         supabase.from('orders').update({ status }).eq('id', orderId).then(() => {}, () => {});
+        setDoc(doc(firestoreDb, 'orders', orderId), { orderStatus: status, updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
       }
     }
+  }
+
+  public async updateOrder(orderId: string, updatedData: Partial<Order>): Promise<Order | null> {
+    const orders = this.getOrders();
+    const index = orders.findIndex((o) => o.id === orderId);
+    if (index === -1) return null;
+
+    const existing = orders[index];
+    const updated: Order = {
+      ...existing,
+      ...updatedData,
+      id: existing.id,
+      syncStatus: this.isOnlineStatus ? 'synced' : 'pending',
+    };
+
+    orders[index] = updated;
+    localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
+    await offlineDb.put('orders', updated);
+
+    this.addActivityLog({
+      action: 'order_updated_by_supervisor',
+      entityType: 'order',
+      entityId: orderId,
+      description: `Order ${orderId} (${updated.customerName}) details updated by supervisor`,
+      status: 'success',
+    });
+
+    if (this.isOnlineStatus) {
+      try {
+        await supabase
+          .from('orders')
+          .update({
+            customer_name: updated.customerName,
+            payment_method: updated.paymentMethod,
+            items: updated.items,
+            subtotal: updated.subtotal,
+            amount_received: updated.amountReceived,
+            change_amount: updated.changeAmount,
+            status: updated.status || 'pending',
+          })
+          .eq('id', orderId);
+      } catch (err) {
+        console.warn('Supabase order update error:', err);
+      }
+      try {
+        await setDoc(
+          doc(firestoreDb, 'orders', orderId),
+          {
+            id: updated.id,
+            customerName: updated.customerName,
+            totalAmount: updated.subtotal,
+            paymentStatus: updated.paymentMethod,
+            orderStatus: updated.status || 'pending',
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      } catch {
+        // ignore
+      }
+    } else {
+      await offlineDb.enqueue({
+        id: updated.id,
+        entityType: 'order',
+        action: 'update',
+        data: updated,
+      });
+    }
+
+    return updated;
+  }
+
+  public async deleteOrder(orderId: string): Promise<boolean> {
+    const orders = this.getOrders().filter((o) => o.id !== orderId);
+    localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
+    await offlineDb.delete('orders', orderId);
+    await offlineDb.removeQueueItem(orderId);
+
+    this.addActivityLog({
+      action: 'order_deleted_by_supervisor',
+      entityType: 'order',
+      entityId: orderId,
+      description: `Order ${orderId} was deleted by supervisor`,
+      status: 'warning',
+    });
+
+    if (this.isOnlineStatus) {
+      try {
+        await supabase.from('orders').delete().eq('id', orderId);
+      } catch (err) {
+        console.warn('Supabase order delete error:', err);
+      }
+      try {
+        await deleteDoc(doc(firestoreDb, 'orders', orderId));
+      } catch {
+        // ignore
+      }
+    }
+    return true;
   }
 
   // --- User Profile ---
@@ -1098,7 +1314,108 @@ class StorageService {
     if (rep) {
       rep.syncStatus = syncStatus;
       localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports));
+      offlineDb.put('eod_reports', rep);
+      if (this.isOnlineStatus) {
+        supabase.from('eod_reports').update({ sync_status: syncStatus }).eq('id', reportId).then(() => {}, () => {});
+        setDoc(doc(firestoreDb, 'eod_reports', reportId), { syncStatus, updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+      }
     }
+  }
+
+  public async updateReport(reportId: string, updatedData: Partial<EodReport>): Promise<EodReport | null> {
+    const reports = this.getReports();
+    const index = reports.findIndex((r) => r.id === reportId);
+    if (index === -1) return null;
+
+    const existing = reports[index];
+    const updated: EodReport = {
+      ...existing,
+      ...updatedData,
+      id: existing.id,
+      syncStatus: updatedData.syncStatus || existing.syncStatus,
+    };
+
+    reports[index] = updated;
+    localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports));
+    await offlineDb.put('eod_reports', updated);
+
+    this.addActivityLog({
+      action: 'report_updated_by_supervisor',
+      entityType: 'eod_report',
+      entityId: reportId,
+      description: `EOD Report ${reportId} (Staff ${updated.staffId}) updated by supervisor`,
+      status: 'success',
+    });
+
+    if (this.isOnlineStatus) {
+      try {
+        await supabase
+          .from('eod_reports')
+          .update({
+            total_revenue: updated.totalRevenue,
+            total_deliveries: updated.totalDeliveries,
+            delivered_count: updated.deliveredCount,
+            collected_count: updated.collectedCount,
+            partial_count: updated.partialCount,
+            field_notes: updated.fieldNotes,
+            sync_status: updated.syncStatus,
+          })
+          .eq('id', reportId);
+      } catch (err) {
+        console.warn('Supabase report update error:', err);
+      }
+      try {
+        await setDoc(
+          doc(firestoreDb, 'eod_reports', reportId),
+          {
+            id: updated.id,
+            staffId: updated.staffId,
+            totalRevenue: updated.totalRevenue,
+            totalDeliveries: updated.totalDeliveries,
+            deliveredCount: updated.deliveredCount,
+            collectedCount: updated.collectedCount,
+            partialCount: updated.partialCount,
+            fieldNotes: updated.fieldNotes,
+            syncStatus: updated.syncStatus,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      } catch {
+        // ignore
+      }
+    }
+
+    return updated;
+  }
+
+  public async deleteReport(reportId: string): Promise<boolean> {
+    const reports = this.getReports().filter((r) => r.id !== reportId);
+    localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports));
+    await offlineDb.delete('eod_reports', reportId);
+    await offlineDb.removeQueueItem(reportId);
+
+    this.addActivityLog({
+      action: 'report_deleted_by_supervisor',
+      entityType: 'eod_report',
+      entityId: reportId,
+      description: `EOD Report ${reportId} was deleted by supervisor`,
+      status: 'warning',
+    });
+
+    if (this.isOnlineStatus) {
+      try {
+        await supabase.from('eod_reports').delete().eq('id', reportId);
+      } catch (err) {
+        console.warn('Supabase report delete error:', err);
+      }
+      try {
+        await deleteDoc(doc(firestoreDb, 'eod_reports', reportId));
+      } catch {
+        // ignore
+      }
+    }
+    return true;
   }
 
   // --- Messages ---
@@ -1128,6 +1445,32 @@ class StorageService {
     return newMsg;
   }
 
+  public deleteMessage(msgId: string): boolean {
+    const messages = this.getMessages().filter((m) => m.id !== msgId);
+    localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
+    offlineDb.delete('messages', msgId);
+    return true;
+  }
+
+  public updateMessage(msgId: string, updatedContent: string): boolean {
+    const messages = this.getMessages();
+    const idx = messages.findIndex((m) => m.id === msgId);
+    if (idx === -1) return false;
+    messages[idx] = {
+      ...messages[idx],
+      content: updatedContent,
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
+    offlineDb.put('messages', messages[idx]);
+    return true;
+  }
+
+  public clearAllMessages(): boolean {
+    localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify([]));
+    return true;
+  }
+
   // --- Tasks ---
   public getTasks(): TimelineTask[] {
     const raw = localStorage.getItem(STORAGE_KEYS.TASKS);
@@ -1139,6 +1482,36 @@ class StorageService {
     } catch {
       return [];
     }
+  }
+
+  public saveTask(taskData: Omit<TimelineTask, 'id'>): TimelineTask {
+    const newTask: TimelineTask = {
+      ...taskData,
+      id: 'task-' + Date.now(),
+    };
+    const tasks = this.getTasks();
+    tasks.unshift(newTask);
+    localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks));
+    offlineDb.put('timeline_tasks', newTask);
+    return newTask;
+  }
+
+  public updateTask(taskId: string, updatedData: Partial<TimelineTask>): TimelineTask | null {
+    const tasks = this.getTasks();
+    const idx = tasks.findIndex((t) => t.id === taskId);
+    if (idx === -1) return null;
+    const updated: TimelineTask = { ...tasks[idx], ...updatedData, id: tasks[idx].id };
+    tasks[idx] = updated;
+    localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks));
+    offlineDb.put('timeline_tasks', updated);
+    return updated;
+  }
+
+  public deleteTask(taskId: string): boolean {
+    const tasks = this.getTasks().filter((t) => t.id !== taskId);
+    localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks));
+    offlineDb.delete('timeline_tasks', taskId);
+    return true;
   }
 
   public toggleTask(taskId: string): TimelineTask[] {
@@ -1183,6 +1556,17 @@ class StorageService {
     };
     logs.unshift(entry);
     localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(logs.slice(0, 100)));
+  }
+
+  public deleteActivityLog(logId: string): boolean {
+    const logs = this.getActivityLogs().filter((l) => l.id !== logId);
+    localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(logs));
+    return true;
+  }
+
+  public clearActivityLogs(): boolean {
+    localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify([]));
+    return true;
   }
 
   // --- Sync State & Queue Management ---

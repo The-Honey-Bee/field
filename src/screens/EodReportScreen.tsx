@@ -6,6 +6,7 @@ import { storageService } from '../services/storage';
 import { Order, EodReport, ProofImage } from '../types';
 import { CameraCaptureModal } from '../components/CameraCaptureModal';
 import { VoiceDictationInput } from '../components/VoiceDictationInput';
+import { EditReportModal } from '../components/EditReportModal';
 import {
   FileText,
   CheckCircle2,
@@ -27,6 +28,7 @@ import {
   Sparkles,
   Layers,
   ZoomIn,
+  Pencil,
 } from 'lucide-react';
 
 interface EodReportScreenProps {
@@ -34,7 +36,7 @@ interface EodReportScreenProps {
 }
 
 export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) => {
-  const { user } = useAuth();
+  const { user, isSupervisor } = useAuth();
   const { t, isSwahili } = useLanguage();
   const [orders, setOrders] = useState<Order[]>([]);
   const [fieldNotes, setFieldNotes] = useState<string>('');
@@ -44,6 +46,7 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [previewModalImage, setPreviewModalImage] = useState<ProofImage | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
+  const [isEditReportOpen, setIsEditReportOpen] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -259,9 +262,39 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
                 </div>
               </div>
             </div>
-            <span className="text-[11px] bg-[#00C46A]/20 text-[#00C46A] px-2.5 py-1 rounded-full font-bold">
-              {submittedReport.proofImages?.length || 0} {t('eod.proofs_attached', 'Visual Proofs Attached')}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] bg-[#00C46A]/20 text-[#00C46A] px-2.5 py-1 rounded-full font-bold">
+                {submittedReport.proofImages?.length || 0} {t('eod.proofs_attached', 'Visual Proofs Attached')}
+              </span>
+              {isSupervisor && (
+                <div className="flex items-center gap-1.5 ml-2">
+                  <button
+                    onClick={() => setIsEditReportOpen(true)}
+                    className="px-2.5 py-1 bg-[#1A2E1C] hover:bg-[#253D28] text-[#00C46A] border border-[#2A5038] rounded-lg text-xs font-bold transition flex items-center gap-1"
+                    title={isSwahili ? 'Hariri Ripoti ya EOD' : 'Edit EOD Report'}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>{isSwahili ? 'Hariri' : 'Edit'}</span>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const confirmPrompt = isSwahili
+                        ? `Je, una uhakika unataka kufuta ripoti ya EOD ${submittedReport.id}?`
+                        : `Are you sure you want to delete EOD report ${submittedReport.id}?`;
+                      if (window.confirm(confirmPrompt)) {
+                        await storageService.deleteReport(submittedReport.id);
+                        setSubmittedReport(null);
+                      }
+                    }}
+                    className="px-2.5 py-1 bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-800/40 rounded-lg text-xs font-bold transition flex items-center gap-1"
+                    title={isSwahili ? 'Futa Ripoti ya EOD' : 'Delete EOD Report'}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{isSwahili ? 'Futa' : 'Delete'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {submittedReport.proofImages && submittedReport.proofImages.length > 0 && (
@@ -631,6 +664,19 @@ export const EodReportScreen: React.FC<EodReportScreenProps> = ({ onNavigate }) 
         onClose={() => setIsCameraOpen(false)}
         onCapture={(newProof) => setProofImages((prev) => [newProof, ...prev])}
         onFallbackToNativeInput={() => cameraInputRef.current?.click()}
+      />
+
+      {/* Supervisor Edit Report Modal */}
+      <EditReportModal
+        report={submittedReport}
+        isOpen={isEditReportOpen}
+        onClose={() => setIsEditReportOpen(false)}
+        onSave={(updated) => {
+          setSubmittedReport(updated);
+        }}
+        onDelete={() => {
+          setSubmittedReport(null);
+        }}
       />
     </div>
   );

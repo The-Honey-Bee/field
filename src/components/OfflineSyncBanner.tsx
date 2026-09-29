@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { WifiOff, RefreshCw, CheckCircle2, Cloud, ChevronRight } from 'lucide-react';
+import { WifiOff, RefreshCw, CheckCircle2, Cloud, ChevronRight, ShieldAlert } from 'lucide-react';
 import { storageService } from '../services/storage';
+import { useAuth } from '../context/AuthContext';
 
 interface OfflineSyncBannerProps {
   onOpenSyncCenter?: () => void;
 }
 
 export const OfflineSyncBanner: React.FC<OfflineSyncBannerProps> = ({ onOpenSyncCenter }) => {
+  const { user, isOfflineSession } = useAuth();
   const [isOnline, setIsOnline] = useState<boolean>(storageService.isOnline());
   const [isSyncing, setIsSyncing] = useState<boolean>(storageService.isSyncing());
   const [pendingCount, setPendingCount] = useState<number>(storageService.getPendingSyncCount());
@@ -41,7 +43,7 @@ export const OfflineSyncBanner: React.FC<OfflineSyncBannerProps> = ({ onOpenSync
     };
   }, [isOnline]);
 
-  if (isOnline && pendingCount === 0 && !isSyncing && !showRecentlySynced) {
+  if (isOnline && pendingCount === 0 && !isSyncing && !showRecentlySynced && !isOfflineSession) {
     return null;
   }
 
@@ -50,6 +52,8 @@ export const OfflineSyncBanner: React.FC<OfflineSyncBannerProps> = ({ onOpenSync
       className={`w-full text-xs transition-all duration-300 ${
         !isOnline
           ? 'bg-[#F59E0B]/15 border-b border-[#F59E0B]/30 text-[#F59E0B]'
+          : isOfflineSession
+          ? 'bg-[#1E3A2F]/80 border-b border-[#00C46A]/40 text-[#A3E5C4]'
           : isSyncing
           ? 'bg-[#006B3C]/20 border-b border-[#00C46A]/30 text-[#00C46A]'
           : showRecentlySynced
@@ -65,6 +69,14 @@ export const OfflineSyncBanner: React.FC<OfflineSyncBannerProps> = ({ onOpenSync
               <span>
                 <strong>Offline Mode Active:</strong> Field orders and reports are cached locally on this device. They will automatically sync to cloud once connection is restored.
                 {pendingCount > 0 && ` (${pendingCount} pending record${pendingCount > 1 ? 's' : ''})`}
+              </span>
+            </>
+          ) : isOfflineSession ? (
+            <>
+              <ShieldAlert className="w-4 h-4 shrink-0 text-[#00C46A]" />
+              <span>
+                <strong>Offline Field Session ({user?.name}):</strong> Authenticated via Local Vault. Durable IndexedDB persistence active.
+                {pendingCount > 0 && ` (${pendingCount} queued for auto-sync)`}
               </span>
             </>
           ) : isSyncing ? (

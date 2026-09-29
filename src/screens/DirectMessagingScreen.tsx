@@ -18,6 +18,9 @@ import {
   ShieldCheck,
   Truck,
   Sparkles,
+  Pencil,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { VoiceMessageRecorder, VoiceMessagePayload } from '../components/VoiceMessageRecorder';
 import { VoiceMessagePlayer } from '../components/VoiceMessagePlayer';
@@ -36,12 +39,16 @@ interface ContactItem {
 }
 
 export const DirectMessagingScreen: React.FC<DirectMessagingScreenProps> = () => {
-  const { user } = useAuth();
+  const { user, isSupervisor } = useAuth();
   const { isSwahili } = useLanguage();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeAudioId, setActiveAudioId] = useState<string | null>(null);
+
+  // Edit Message State
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editingMsgText, setEditingMsgText] = useState<string>('');
   const [contacts, setContacts] = useState<ContactItem[]>([
     {
       id: 'ops-supervisor',
@@ -208,6 +215,26 @@ export const DirectMessagingScreen: React.FC<DirectMessagingScreenProps> = () =>
     setMessages([...storageService.getMessages()]);
   };
 
+  const handleDeleteMessage = (msgId: string) => {
+    if (window.confirm(isSwahili ? 'Futa ujumbe huu?' : 'Delete this message?')) {
+      storageService.deleteMessage(msgId);
+      setMessages([...storageService.getMessages()]);
+    }
+  };
+
+  const handleStartEdit = (msg: ChatMessage) => {
+    setEditingMsgId(msg.id);
+    setEditingMsgText(msg.content);
+  };
+
+  const handleSaveEdit = (msgId: string) => {
+    if (!editingMsgText.trim()) return;
+    storageService.updateMessage(msgId, editingMsgText.trim());
+    setMessages([...storageService.getMessages()]);
+    setEditingMsgId(null);
+    setEditingMsgText('');
+  };
+
   const filteredContacts = contacts.filter(
     (c) =>
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -360,26 +387,75 @@ export const DirectMessagingScreen: React.FC<DirectMessagingScreenProps> = () =>
                     className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                   >
                     <div
-                      className={`max-w-[88%] sm:max-w-[80%] rounded-2xl px-4 py-2.5 text-xs shadow-md ${
+                      className={`max-w-[88%] sm:max-w-[80%] rounded-2xl px-4 py-2.5 text-xs shadow-md relative group ${
                         isMe
                           ? 'bg-[#006B3C] text-white rounded-br-none'
                           : 'bg-[#1A2E1C] text-[#D0E8F0] border border-[#3A5068] rounded-bl-none'
                       }`}
                     >
-                      {!isMe && (
-                        <div className="text-[10px] font-bold text-[#00C46A] mb-1 flex items-center justify-between gap-2">
-                          <span>{msg.senderName}</span>
-                          {isVoice && (
-                            <span className="flex items-center gap-1 text-[9px] text-[#A0B0C0] font-normal">
-                              <Volume2 className="w-3 h-3 text-[#00C46A]" />
-                              <span>{isSwahili ? 'Ujumbe wa Sauti' : 'Voice Memo'}</span>
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        {!isMe ? (
+                          <div className="text-[10px] font-bold text-[#00C46A] flex items-center gap-2">
+                            <span>{msg.senderName}</span>
+                            {isVoice && (
+                              <span className="flex items-center gap-1 text-[9px] text-[#A0B0C0] font-normal">
+                                <Volume2 className="w-3 h-3 text-[#00C46A]" />
+                                <span>{isSwahili ? 'Ujumbe wa Sauti' : 'Voice Memo'}</span>
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span />
+                        )}
 
-                      {/* Render Voice Message Player or Text */}
-                      {isVoice && msg.audioUrl ? (
+                        {/* Supervisor / Author Actions: Edit & Delete */}
+                        {(isSupervisor || isMe) && (
+                          <div className="opacity-70 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
+                            {!isVoice && editingMsgId !== msg.id && (
+                              <button
+                                onClick={() => handleStartEdit(msg)}
+                                className="text-white/70 hover:text-white p-0.5 rounded transition"
+                                title={isSwahili ? 'Hariri ujumbe' : 'Edit message'}
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className="text-white/70 hover:text-red-300 p-0.5 rounded transition"
+                              title={isSwahili ? 'Futa ujumbe' : 'Delete message'}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Render Voice Message Player or Text or Inline Editor */}
+                      {editingMsgId === msg.id ? (
+                        <div className="space-y-1.5 pt-1">
+                          <textarea
+                            value={editingMsgText}
+                            onChange={(e) => setEditingMsgText(e.target.value)}
+                            rows={2}
+                            className="w-full bg-[#0D1E12] border border-[#00C46A] text-white text-xs rounded-lg p-2 outline-none resize-none"
+                          />
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => setEditingMsgId(null)}
+                              className="px-2 py-0.5 text-[10px] text-[#8899AA] hover:text-white"
+                            >
+                              {isSwahili ? 'Ghairi' : 'Cancel'}
+                            </button>
+                            <button
+                              onClick={() => handleSaveEdit(msg.id)}
+                              className="px-2.5 py-0.5 text-[10px] bg-[#00C46A] hover:bg-[#008F50] text-[#0A1A0F] font-bold rounded"
+                            >
+                              {isSwahili ? 'Hifadhi' : 'Save'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : isVoice && msg.audioUrl ? (
                         <VoiceMessagePlayer
                           id={msg.id}
                           audioUrl={msg.audioUrl}
