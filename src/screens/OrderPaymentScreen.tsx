@@ -141,7 +141,7 @@ export const OrderPaymentScreen: React.FC<OrderPaymentScreenProps> = ({ onNaviga
         }));
 
       await storageService.saveOrder({
-        staffId: user?.employeeId || 'ZZ-2024-001',
+        staffId: user?.employeeId || 'ZZ-2026-001',
         customerName: selectedCustomer,
         paymentMethod,
         items: activeItems,

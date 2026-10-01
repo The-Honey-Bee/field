@@ -812,6 +812,85 @@ app.post('/api/customers', async (req, res) => {
   }
 });
 
+// Activity logs endpoint proxying Supabase table "activity_log"
+app.get('/api/activity-logs', async (req, res) => {
+  const url = process.env.VITE_SUPABASE_URL || 'https://xpyxzssbrbcoukdpdxjx.supabase.co';
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhweXh6c3NicmJjb3VrZHBkeGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzNjYwNzYsImV4cCI6MjEwNTk0MjA3Nn0.gL23Rf0dVMv0aDACcoT4Pc3f3iIXjJfYrJyGgSlumMs';
+  try {
+    const response = await fetch(`${url}/rest/v1/activity_log?select=*&order=created_at.desc`, {
+      headers: { apikey: anonKey },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return res.json({ success: true, logs: data });
+    }
+    const errData = await response.json().catch(() => ({}));
+    return res.status(response.status).json({ success: false, error: errData, logs: [] });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message, logs: [] });
+  }
+});
+
+app.post('/api/activity-logs', async (req, res) => {
+  const url = process.env.VITE_SUPABASE_URL || 'https://xpyxzssbrbcoukdpdxjx.supabase.co';
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhweXh6c3NicmJjb3VrZHBkeGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzNjYwNzYsImV4cCI6MjEwNTk0MjA3Nn0.gL23Rf0dVMv0aDACcoT4Pc3f3iIXjJfYrJyGgSlumMs';
+  try {
+    const response = await fetch(`${url}/rest/v1/activity_log`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify(req.body),
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return res.json({ success: true, log: Array.isArray(data) ? data[0] : data });
+    }
+    const errData = await response.json().catch(() => ({}));
+    return res.status(response.status).json({ success: false, error: errData });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// User profiles endpoint proxying Supabase table "user_profiles"
+app.get('/api/user-profiles', async (req, res) => {
+  const url = process.env.VITE_SUPABASE_URL || 'https://xpyxzssbrbcoukdpdxjx.supabase.co';
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhweXh6c3NicmJjb3VrZHBkeGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzNjYwNzYsImV4cCI6MjEwNTk0MjA3Nn0.gL23Rf0dVMv0aDACcoT4Pc3f3iIXjJfYrJyGgSlumMs';
+  try {
+    const response = await fetch(`${url}/rest/v1/user_profiles?select=*`, {
+      headers: { apikey: anonKey },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return res.json({ success: true, profiles: data });
+    }
+    return res.json({ success: true, profiles: [] });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message, profiles: [] });
+  }
+});
+
+// Documents endpoint proxying Supabase table "documents"
+app.get('/api/documents', async (req, res) => {
+  const url = process.env.VITE_SUPABASE_URL || 'https://xpyxzssbrbcoukdpdxjx.supabase.co';
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhweXh6c3NicmJjb3VrZHBkeGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzNjYwNzYsImV4cCI6MjEwNTk0MjA3Nn0.gL23Rf0dVMv0aDACcoT4Pc3f3iIXjJfYrJyGgSlumMs';
+  try {
+    const response = await fetch(`${url}/rest/v1/documents?select=*&order=created_at.desc`, {
+      headers: { apikey: anonKey },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return res.json({ success: true, documents: data });
+    }
+    return res.json({ success: true, documents: [] });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message, documents: [] });
+  }
+});
+
 async function start() {
   // Vite dev middleware or static serving
   if (process.env.NODE_ENV !== 'production') {

@@ -139,6 +139,9 @@ class StorageService {
       // Background cloud data fetch on boot
       this.fetchCustomersFromCloud();
       this.fetchOrdersFromCloud();
+      this.fetchReportsFromCloud();
+      this.fetchMessagesFromCloud();
+      this.fetchProductsFromCloud();
     }
   }
 
@@ -1006,6 +1009,59 @@ class StorageService {
     return this.getOrders();
   }
 
+  public async fetchReportsFromCloud(): Promise<EodReport[]> {
+    try {
+      const { data, error } = await supabase.from('eod_reports').select('*').order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        const cloudReports: EodReport[] = data.map((r: any) => ({
+          id: r.id?.toString() || 'rep-' + Date.now(),
+          staffId: r.staff_id || '',
+          reportDate: r.report_date || new Date().toISOString().split('T')[0],
+          totalRevenue: Number(r.total_revenue) || 0,
+          totalDeliveries: Number(r.total_deliveries) || 0,
+          deliveredCount: Number(r.delivered_count) || 0,
+          collectedCount: Number(r.collected_count) || 0,
+          partialCount: Number(r.partial_count) || 0,
+          deliveries: r.deliveries || [],
+          fieldNotes: r.field_notes || '',
+          syncStatus: r.sync_status || 'submitted',
+          createdAt: r.created_at || new Date().toISOString(),
+        }));
+        localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(cloudReports));
+        for (const cr of cloudReports) {
+          offlineDb.put('eod_reports', cr);
+        }
+        return cloudReports;
+      }
+    } catch {}
+    return this.getReports();
+  }
+
+  public async fetchMessagesFromCloud(): Promise<ChatMessage[]> {
+    try {
+      const { data, error } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
+      if (!error && data && data.length > 0) {
+        const cloudMsgs: ChatMessage[] = data.map((m: any) => ({
+          id: m.id?.toString() || 'msg-' + Date.now(),
+          senderId: m.sender_id || '',
+          senderName: m.sender_name || 'Staff',
+          receiverId: m.receiver_id || '',
+          receiverName: m.receiver_name || 'Supervisor',
+          content: m.content || '',
+          isRead: Boolean(m.is_read),
+          syncStatus: 'sent',
+          createdAt: m.created_at || new Date().toISOString(),
+        }));
+        localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(cloudMsgs));
+        for (const cm of cloudMsgs) {
+          offlineDb.put('messages', cm);
+        }
+        return cloudMsgs;
+      }
+    } catch {}
+    return this.getMessages();
+  }
+
   public async saveOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'syncStatus'>): Promise<Order> {
     const id = 'ord-' + Date.now();
     const isOnline = this.isOnlineStatus;
@@ -1036,6 +1092,8 @@ class StorageService {
     if (isOnline) {
       try {
         await supabase.from('orders').insert({
+          local_id: order.id,
+          staff_id: order.staffId || 'ZZ-2024-001',
           customer_name: order.customerName,
           payment_method: order.paymentMethod,
           items: order.items,
@@ -1043,7 +1101,6 @@ class StorageService {
           amount_received: order.amountReceived,
           change_amount: order.changeAmount,
           sync_status: 'synced',
-          status: 'pending',
           created_at: order.createdAt,
         });
       } catch (err) {
@@ -1273,7 +1330,9 @@ class StorageService {
     if (isOnline) {
       try {
         await supabase.from('eod_reports').insert({
-          staff_id: report.staffId,
+          local_id: report.id,
+          staff_id: report.staffId || 'ZZ-2024-001',
+          report_date: report.reportDate || new Date().toISOString().split('T')[0],
           total_revenue: report.totalRevenue,
           total_deliveries: report.totalDeliveries,
           delivered_count: report.deliveredCount,
@@ -1442,6 +1501,20 @@ class StorageService {
     const messages = this.getMessages();
     messages.push(newMsg);
     localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
+    offlineDb.put('messages', newMsg);
+
+    if (this.isOnlineStatus) {
+      supabase.from('messages').insert({
+        sender_id: newMsg.senderId,
+        sender_name: newMsg.senderName,
+        receiver_id: newMsg.receiverId,
+        receiver_name: newMsg.receiverName,
+        content: newMsg.content,
+        is_read: newMsg.isRead,
+        sync_status: 'sent',
+        created_at: newMsg.createdAt,
+      }).then(() => {}, () => {});
+    }
     return newMsg;
   }
 
@@ -1556,6 +1629,20 @@ class StorageService {
     };
     logs.unshift(entry);
     localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(logs.slice(0, 100)));
+
+    if (this.isOnlineStatus) {
+      supabase.from('activity_log').insert({
+        user_id: entry.userId,
+        user_name: entry.userName,
+        user_role: entry.userRole,
+        action: entry.action,
+        entity_type: entry.entityType,
+        entity_id: entry.entityId,
+        description: entry.description,
+        status: entry.status,
+        created_at: entry.createdAt,
+      }).then(() => {}, () => {});
+    }
   }
 
   public deleteActivityLog(logId: string): boolean {

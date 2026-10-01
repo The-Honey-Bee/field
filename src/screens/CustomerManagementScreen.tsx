@@ -40,7 +40,7 @@ interface CustomerManagementScreenProps {
   onNavigate: (view: string) => void;
 }
 
-const DEFAULT_TERRITORIES = [
+const DEFAULT_TERRITORIES: string[] = [
   'Ilala / Posta',
   'Kinondoni / Masaki',
   'Temeke',
